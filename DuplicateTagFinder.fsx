@@ -4,13 +4,13 @@
 open System
 open FSharp.Data
 
-
 [<Literal>]
-let samplePath = "settings.json"
+let settingsPath = "settings.json"
 
-type Settings = JsonProvider<samplePath>
+type Settings = JsonProvider<settingsPath>
 
 type ExclusionPair = { Artist: string option; Title: string option }
+
 type SettingsType =
     { CachedTagFile: string
       Exclusions: ExclusionPair array
@@ -21,13 +21,13 @@ let toSettings (x: Settings.Root) =
     { CachedTagFile = x.CachedTagFile
       Exclusions =
           x.Exclusions
-          |> Seq.cast
-          |> Seq.toArray
+          // |> Seq.cast
+          // |> Seq.toArray
           |> Array.map (fun y -> { Artist = y.Artist; Title = y.Title })
       ArtistReplacements = x.ArtistReplacements
       TitleReplacements = x.TitleReplacements }
 
-let settings = Settings.Load(samplePath)// |> toSettings
+let settings = Settings.Load(settingsPath)// |> toSettings
 
 printfn $"Cached Tag File:     %s{settings.CachedTagFile}"
 printfn $"Exclusions:          %d{settings.Exclusions.Length}"
@@ -38,6 +38,8 @@ printfn $"Title Replacements:  %d{settings.TitleReplacements.Length}"
 let tagSample = """
 [
   {
+    "FileName": "",
+    "DirectoryName": "",
     "Artists": [],
     "AlbumArtists": [],
     "Album": "",
@@ -46,14 +48,16 @@ let tagSample = """
     "Year": 0,
     "Genres": [],
     "Duration": "00:00:00",
-    "UpdatedAt": "2023-09-13T13:49:44+09:00"
+    "LastWriteTime": "2023-09-13T13:49:44+09:00"
   }
 ]"""
 
 type CachedTags = JsonProvider<tagSample>
 
 type TaggedFileInfo =
-    { Artists: string array
+    { FileName: string
+      DirectoryName: string
+      Artists: string array
       AlbumArtists: string array
       Album: string
       TrackNo: int // uint?
@@ -61,13 +65,15 @@ type TaggedFileInfo =
       Year: int
       Genres: string array
       Duration: TimeSpan
-      UpdatedAt: DateTimeOffset }
+      LastWriteTime: DateTimeOffset }
 
 let toTaggedFileInfo (x: CachedTags.Root) =
     let convertToFsharpArray coll =
         coll |> Seq.cast |> Seq.toArray
 
-    { Artists = x.Artists |> convertToFsharpArray
+    { FileName = x.FileName.JsonValue.ToString() // ?
+      DirectoryName = x.DirectoryName.JsonValue.ToString() // ?
+      Artists = x.Artists |> convertToFsharpArray
       AlbumArtists = x.AlbumArtists |> convertToFsharpArray
       Album = x.Album.JsonValue.ToString() // ?
       TrackNo = x.TrackNo
@@ -75,38 +81,40 @@ let toTaggedFileInfo (x: CachedTags.Root) =
       Year = x.Year
       Genres = x.Genres |> convertToFsharpArray
       Duration = x.Duration
-      UpdatedAt = x.UpdatedAt }
+      LastWriteTime = x.LastWriteTime }
 
-let excludeFile (file: TaggedFileInfo) (settings: SettingsType) =
-    let containsCaseInsensitive (value: string) (arr: string array) =
-        arr
-        |> Array.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, value))
-
-    settings.Exclusions
-    // |> Seq.cast
-    // |> Seq.toArray
-    // |> Array.map (fun y -> { Artist = y.Artist; Title = y.Title })
-    |> Seq.exists (fun exclusion ->
-         match exclusion.Artist, exclusion.Title with
-         | Some artist, Some title ->
-             (file.AlbumArtists |> containsCaseInsensitive artist ||
-              file.Artists |> containsCaseInsensitive artist) &&
-             file.Title.StartsWith(title, StringComparison.InvariantCultureIgnoreCase)
-         | Some artist, None ->
-             (file.AlbumArtists |> containsCaseInsensitive artist ||
-              file.Artists |> containsCaseInsensitive artist)
-         | None, Some title ->
-             file.Title.StartsWith(title, StringComparison.InvariantCultureIgnoreCase)
-         | _ -> false)
-    |> (=) false
+// let excludeFile (file: TaggedFileInfo) (settings: SettingsType) =
+// let excludeFile (file: CachedTags.Root) (settings: SettingsType) =
+//     let containsCaseInsensitive (value: string) (arr: string array) =
+//         arr
+//         |> Array.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, value))
+//
+//     settings.Exclusions
+//     // |> Seq.cast
+//     // |> Seq.toArray
+//     // |> Array.map (fun y -> { Artist = y.Artist; Title = y.Title })
+//     |> Seq.exists (fun exclusion ->
+//          match exclusion.Artist, exclusion.Title with
+//          | Some artist, Some title ->
+//              (file.AlbumArtists |> containsCaseInsensitive artist ||
+//               file.Artists |> containsCaseInsensitive artist) &&
+//              file.Title.JsonValue.StartsWith(title, StringComparison.InvariantCultureIgnoreCase)
+//          | Some artist, None ->
+//              (file.AlbumArtists |> containsCaseInsensitive artist ||
+//               file.Artists |> containsCaseInsensitive artist)
+//          | None, Some title ->
+//              file.Title.StartsWith(title, StringComparison.InvariantCultureIgnoreCase)
+//          | _ -> false)
+//     |> (=) false
 
 try
     let rawTagJson = System.IO.File.ReadAllText settings.CachedTagFile
     let parsedTags = CachedTags.Parse rawTagJson
     printfn $"Tag count: %d{parsedTags.Length}"
-    // let data = parsedTags |> Array.map toTaggedFileInfo
-    // printfn $"Tag count: %d{data.Length}"
-    // let filtered = data |> Array.filter (excludeFile data settings.Exclusions)
+    let data = parsedTags // |> Array.map toTaggedFileInfo
+    // printfn $"%A{data.GetType().Name}"
+    let filtered = data // |> Array.filter (excludeFile data settings.Exclusions)
+    printfn $"Tag count: %d{data.Length}"
 with
 | e ->
     printfn $"ERROR: {e.Message}"
