@@ -86,30 +86,26 @@ let toTaggedFileInfo (x: CachedTags.Root) =
       LastWriteTime = x.LastWriteTime }
 
 let excludeFile (file: CachedTags.Root) (settings: SettingsType) =
-    let containsCaseInsensitive (value: string) (arr: string seq) =
+    let extractValue (x: Runtime.BaseTypes.IJsonDocument) = x.JsonValue.InnerText()
+
+    let contains (value: string) (arr: string seq) =
         arr
         |> Seq.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, value))
 
-    // let albumArtists = file.AlbumArtists |> Seq.map _.JsonValue.InnerText()
-    // let artists = file.Artists |> Seq.map _.JsonValue.InnerText()
-    // let title = file.Title.JsonValue.InnerText()
-
-    let tagData =
-        {| AlbumArtists = file.AlbumArtists |> Seq.map _.JsonValue.InnerText()
-           Artists = file.Artists |> Seq.map _.JsonValue.InnerText()
-           Title = file.Title.JsonValue.InnerText() |}
+    let tags =
+        {| AlbumArtists = Seq.map extractValue file.AlbumArtists
+           Artists = Seq.map extractValue file.Artists
+           Title = extractValue file.Title |}
 
     let shouldExclude rule =
          match rule.Artist, rule.Title with
          | Some a, Some t ->
-             (tagData.AlbumArtists |> containsCaseInsensitive a ||
-              tagData.Artists |> containsCaseInsensitive a) &&
-             tagData.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+             (tags.AlbumArtists |> contains a || tags.Artists |> contains a) &&
+             tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
          | Some a, None ->
-             (tagData.AlbumArtists |> containsCaseInsensitive a ||
-              tagData.Artists |> containsCaseInsensitive a)
+             (tags.AlbumArtists |> contains a || tags.Artists |> contains a)
          | None, Some t ->
-             tagData.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+             tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
          | _ -> false
 
     settings.Exclusions
