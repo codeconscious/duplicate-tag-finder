@@ -95,33 +95,39 @@ module Tags =
     //       Duration = fileTags.Duration
     //       LastWriteTime = fileTags.LastWriteTime }
 
+module Exclusions =
+    open Utilities
+    open Settings
+    open Tags
+
+    let excludeFile (file: CachedTags.Root) (settings: SettingsType) =
+        let contains (target: string) (collection: string seq) =
+            collection
+            |> Seq.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, target))
+
+        let tags =
+            {| AlbumArtists = Seq.map extractText file.AlbumArtists
+               Artists = Seq.map extractText file.Artists
+               Title = extractText file.Title |}
+
+        let isExcluded rule =
+             match rule.Artist, rule.Title with
+             | Some a, Some t ->
+                 (tags.AlbumArtists |> contains a || tags.Artists |> contains a) &&
+                 tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+             | Some a, None ->
+                 (tags.AlbumArtists |> contains a || tags.Artists |> contains a)
+             | None, Some t ->
+                 tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+             | _ -> false
+
+        settings.Exclusions
+        |> Array.exists isExcluded
+
 open Settings
 open Tags
 open Utilities
-
-let excludeFile (file: CachedTags.Root) (settings: SettingsType) =
-    let contains (target: string) (collection: string seq) =
-        collection
-        |> Seq.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, target))
-
-    let tags =
-        {| AlbumArtists = Seq.map extractText file.AlbumArtists
-           Artists = Seq.map extractText file.Artists
-           Title = extractText file.Title |}
-
-    let isExcluded rule =
-         match rule.Artist, rule.Title with
-         | Some a, Some t ->
-             (tags.AlbumArtists |> contains a || tags.Artists |> contains a) &&
-             tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
-         | Some a, None ->
-             (tags.AlbumArtists |> contains a || tags.Artists |> contains a)
-         | None, Some t ->
-             tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
-         | _ -> false
-
-    settings.Exclusions
-    |> Array.exists isExcluded
+open Exclusions
 
 try
     let rawTagJson = System.IO.File.ReadAllText load.CachedTagFile
