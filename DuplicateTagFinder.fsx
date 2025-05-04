@@ -8,7 +8,13 @@ open FSharp.Data
 module Utilities =
     let extractText (x: Runtime.BaseTypes.IJsonDocument) = x.JsonValue.InnerText()
 
+    let joinWithSeparator (separator: string) (x: Runtime.BaseTypes.IJsonDocument array) =
+        let texts = Array.map extractText x
+        String.Join(separator, texts)
+
     let formatWithCommas (i: int) = i.ToString("N0", CultureInfo.InvariantCulture)
+
+open Utilities
 
 module Settings =
     [<Literal>]
@@ -124,17 +130,44 @@ module Exclusions =
         settings.Exclusions
         |> Array.exists isExcluded
 
+module Modifications =
+    let removeSubstrings (substrings: string array) (text: string) : string =
+        Array.fold
+            (fun acc x -> acc.Replace(x, String.Empty))
+            text
+            substrings
+
 open Settings
 open Tags
 open Utilities
 open Exclusions
+open Modifications
 
 try
+    let settings = Settings.load
+
     let rawTagJson = System.IO.File.ReadAllText load.CachedTagFile
     let allTags = CachedTags.Parse rawTagJson
     printfn $"Total file count:    %s{formatWithCommas allTags.Length}"
+
     let filteredTags = allTags |> Array.filter (fun x -> not <| excludeFile x load)
     printfn $"Filtered file count: %s{formatWithCommas filteredTags.Length}"
+
+    filteredTags
+    |> Array.filter (fun t -> t.Artists.Length > 0 && t.Title |> extractText |> _.Length > 0)
+    |> Array.groupBy (fun t ->
+        let artists = t.Artists
+                     |> Array.map extractText
+                     |> String.Concat
+                     |> removeSubstrings settings.ArtistReplacements
+        let title = t.Title
+                    |> extractText
+                    |> removeSubstrings settings.TitleReplacements
+        $"{artists}{title}")
+    |> Array.filter (fun x -> x |> snd |> _.Length > 1)
+    |> Array.iteri (fun i x ->
+        snd x
+        |> Array.iter (fun x -> printfn $"""{i}. {joinWithSeparator "," x.Artists}  /  {x.Title}"""))
 with
 | e ->
     printfn $"ERROR: {e.Message}"
