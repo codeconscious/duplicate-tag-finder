@@ -6,15 +6,19 @@ open System.Globalization
 open FSharp.Data
 
 module Utilities =
-    let extractText (x: Runtime.BaseTypes.IJsonDocument) = x.JsonValue.InnerText()
+    let extractText (x: Runtime.BaseTypes.IJsonDocument) =
+        x.JsonValue.InnerText()
 
-    let joinWithSeparator (separator: string) (x: Runtime.BaseTypes.IJsonDocument array) =
-        let texts = Array.map extractText x
+    // let joinWithSeparator (separator: string) (xs: Runtime.BaseTypes.IJsonDocument array) =
+    //     let texts = Array.map extractText xs
+    //     String.Join(separator, texts)
+
+    let joinWithSeparator (separator: string) (xs: Runtime.BaseTypes.IJsonDocument array) =
+        let texts = Array.map extractText xs
         String.Join(separator, texts)
 
-    let formatWithCommas (i: int) = i.ToString("N0", CultureInfo.InvariantCulture)
-
-open Utilities
+    let formatWithCommas (i: int) =
+        i.ToString("N0", CultureInfo.InvariantCulture)
 
 module Settings =
     [<Literal>]
@@ -41,7 +45,7 @@ module Settings =
           ArtistReplacements = settings.ArtistReplacements
           TitleReplacements = settings.TitleReplacements }
 
-    let load = Settings.Load(settingsPath) |> toSettings
+    let load () = Settings.Load settingsPath |> toSettings
 
     let summarize settings =
         printfn $"Cached Tag File:     %s{settings.CachedTagFile}"
@@ -144,32 +148,43 @@ open Exclusions
 open Modifications
 
 try
-    let settings = Settings.load
+    let settings = Settings.load ()
+    summarize settings
 
-    let rawTagJson = System.IO.File.ReadAllText load.CachedTagFile
+    let rawTagJson = System.IO.File.ReadAllText settings.CachedTagFile
     let allTags = CachedTags.Parse rawTagJson
     printfn $"Total file count:    %s{formatWithCommas allTags.Length}"
 
-    let filteredTags = allTags |> Array.filter (fun x -> not <| excludeFile x load)
+    let filteredTags = allTags |> Array.filter (fun x -> not <| excludeFile x settings)
     printfn $"Filtered file count: %s{formatWithCommas filteredTags.Length}"
 
     filteredTags
-    |> Array.filter (fun t -> t.Artists.Length > 0 && t.Title |> extractText |> _.Length > 0)
-    |> Array.groupBy (fun t ->
-        let artists = t.Artists
-                     |> Array.map extractText
-                     |> String.Concat
-                     |> removeSubstrings settings.ArtistReplacements
-        let title = t.Title
+    |> Array.filter (fun track ->
+        let hasArtists = track.Artists.Length > 0
+        let titleText = extractText track.Title
+        let hasTitle = not (String.IsNullOrWhiteSpace titleText)
+        hasArtists && hasTitle)
+    |> Array.groupBy (fun track ->
+        let artists = track.Artists
+                      |> Array.map extractText
+                      |> String.Concat
+                      |> removeSubstrings settings.ArtistReplacements
+        let title = track.Title
                     |> extractText
                     |> removeSubstrings settings.TitleReplacements
         $"{artists}{title}")
-    |> Array.filter (fun x -> x |> snd |> _.Length > 1)
-    |> Array.iteri (fun i x ->
-        snd x
-        |> Array.iter (fun x -> printfn $"""{i}. {joinWithSeparator "," x.Artists}  /  {x.Title}"""))
+    |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
+    |> Array.iteri (fun i groupedTracks ->
+        let artists =
+            snd groupedTracks
+            |> Array.head
+            |> _.Artists
+            |> joinWithSeparator ", "
+        printfn $"{i + 1}. {artists}"
+
+        snd groupedTracks
+        |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
 with
 | e ->
     printfn $"ERROR: {e.Message}"
     printfn $"ERROR: {e.StackTrace}"
-
