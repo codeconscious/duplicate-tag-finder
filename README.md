@@ -10,7 +10,7 @@ This is an F# script that parses JSON files contains audio tag data of a certain
 
 # Running
 
-First, you must already have a JSON file that contains the tag data that you wish to parse. It must in this format:
+First, you must already have a JSON file that contains the tag data that you wish to examine, and it must in this format:
 
 ```json
 [
