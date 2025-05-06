@@ -9,10 +9,6 @@ module Utilities =
     let extractText (x: Runtime.BaseTypes.IJsonDocument) =
         x.JsonValue.InnerText()
 
-    // let joinWithSeparator (separator: string) (xs: Runtime.BaseTypes.IJsonDocument array) =
-    //     let texts = Array.map extractText xs
-    //     String.Join(separator, texts)
-
     let joinWithSeparator (separator: string) (xs: Runtime.BaseTypes.IJsonDocument array) =
         let texts = Array.map extractText xs
         String.Join(separator, texts)
@@ -176,7 +172,8 @@ try
     |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
     |> Array.iteri (fun i groupedTracks ->
         let artists =
-            snd groupedTracks
+            groupedTracks
+            |> snd
             |> Array.head
             |> _.Artists
             |> joinWithSeparator ", "
