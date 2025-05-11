@@ -7,10 +7,21 @@ open System
 open System.Globalization
 open FSharp.Data
 open FsToolkit.ErrorHandling
-open System
 open System.IO
 
-type Startwatch = Startwatch.Library.Watch
+type Errors =
+    | InvalidArgCount
+    | MediaDirectoryMissing
+
+module ArgValidation =
+    let validate =
+        if fsi.CommandLineArgs.Length <> 3 // Index 0 is the stript nameof.
+        then Error InvalidArgCount
+        else
+            let mediaDir, cachedTagFile = DirectoryInfo fsi.CommandLineArgs[1], FileInfo fsi.CommandLineArgs[2]
+            if not mediaDir.Exists
+            then Error MediaDirectoryMissing
+            else Ok (mediaDir, cachedTagFile)
 
 module Utilities =
     let extractText (x: Runtime.BaseTypes.IJsonDocument) =
@@ -24,22 +35,15 @@ module Utilities =
         i.ToString("N0", CultureInfo.InvariantCulture)
 
 module Files =
-    type Errors =
-        | DirectoryMissing
-
-    let getFileInfos dirPath =
+    let getFileInfos (dirPath: DirectoryInfo) =
         let isSupportedAudioFile (fileInfo: FileInfo) =
             [".mp3"; ".m4a"; ".mp4"; ".ogg"; ".flac"]
             |> List.contains fileInfo.Extension
 
         // TODO: Add try block.
-        if not (Directory.Exists dirPath)
-        then Error DirectoryMissing
-        else
-            Directory.EnumerateFiles(dirPath, "*", SearchOption.AllDirectories)
-            |> Seq.map (fun item -> FileInfo item)
-            |> Seq.filter isSupportedAudioFile
-            |> Ok
+        dirPath.EnumerateFiles("*", SearchOption.AllDirectories)
+        |> Seq.filter isSupportedAudioFile
+        |> Ok
 
     let readFileTags (filePath: string) : TagLib.File =
         TagLib.File.Create filePath
@@ -141,15 +145,15 @@ let compareWithCachedTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>
             else cachedTagInfoToNew thisFileTags
         else createTagEntry fileInfo)
 
-let run =
+let run () =
     result {
-        let! fileInfos = getFileInfos fsi.CommandLineArgs[1]
-        let cachedTagFileInfo = FileInfo fsi.CommandLineArgs[2]
+        let! mediaDir, cachedTagFile = ArgValidation.validate
+        let! fileInfos = getFileInfos mediaDir
 
         let cachedTagMap =
-            if cachedTagFileInfo.Exists
+            if cachedTagFile.Exists
             then
-                let cachedTagJson = System.IO.File.ReadAllText cachedTagFileInfo.FullName
+                let cachedTagJson = System.IO.File.ReadAllText cachedTagFile.FullName
                 let cachedTags: JsonProvider<tagSample>.Root array = getCachedData cachedTagJson
                 cachedTags
                 |> Array.map (fun t -> Path.Combine [| extractText t.DirectoryName; extractText t.FileNameOnly |], t)
@@ -164,16 +168,16 @@ let run =
         let newJson = JsonSerializer.Serialize(newTags, options)
 
         // Back up the old file.
-        if cachedTagFileInfo.Exists
+        if cachedTagFile.Exists
         then
-            let backUpFileName = Path.GetFileNameWithoutExtension cachedTagFileInfo.Name + "-" + DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss" + cachedTagFileInfo.Extension
-            cachedTagFileInfo.CopyTo(Path.Combine(cachedTagFileInfo.DirectoryName, backUpFileName)) |> ignore
+            let backUpFileName = Path.GetFileNameWithoutExtension cachedTagFile.Name + "-" + DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss" + cachedTagFile.Extension
+            cachedTagFile.CopyTo(Path.Combine(cachedTagFile.DirectoryName, backUpFileName)) |> ignore
 
-        File.WriteAllText(cachedTagFileInfo.FullName, newJson)
+        File.WriteAllText(cachedTagFile.FullName, newJson)
     }
 
-let watch = Startwatch()
-match run with
+let watch = Startwatch.Library.Watch()
+match run () with
 | Ok _ ->
     printfn $"Done in {watch.ElapsedFriendly}"
     0
