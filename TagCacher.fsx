@@ -91,13 +91,6 @@ let compareWithCachedTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>
     let createTagEntry (fileInfo: FileInfo) =
         let newestTags = readFileTags fileInfo.FullName
 
-        let setDefaultIfNull x defaultValue =
-            match x with
-            | null -> defaultValue
-            | _ -> x
-
-        // printfn "%A" fileInfo.FullName // TODO: DELETE
-
         if newestTags.Tag = null
         then
             { FileNameOnly = fileInfo.Name
@@ -125,8 +118,8 @@ let compareWithCachedTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>
               LastWriteTime = fileInfo.LastWriteTime }
 
     let cachedTagInfoToNew (cached: JsonProvider<tagSample>.Root) =
-        { FileNameOnly = extractText cached.FileNameOnly
-          DirectoryName = extractText cached.DirectoryName
+        { FileNameOnly = cached.FileNameOnly |> extractText
+          DirectoryName = cached.DirectoryName |> extractText
           Artists = cached.Artists |> Array.map extractText
           AlbumArtists = cached.AlbumArtists |> Array.map extractText
           Album = cached.Album |> extractText
