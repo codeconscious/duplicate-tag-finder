@@ -1,14 +1,32 @@
-# Duplicate Tag Finder
+# Cached Tag Creater and Duplicate Finder
 
-This is an F# script that parses JSON files contains audio tag data of a certain format and reports apparent duplicates. I mainly created this simple tool to practice with JSON type providers in F#.
+This is a pair of F# scripts that do two things:
+- Cache the audio metadata (i.e., tags) in audio files from a specified directory to a specified file on your computer
+- Parse the cached data and reports on likely duplicates
+
+I mainly created these to practice with [JSON type providers](https://fsprojects.github.io/FSharp.Data/library/JsonProvider.html) in F#.
 
 # Requirements
 
 - [.NET 9 runtime](https://dotnet.microsoft.com/en-us/download/dotnet/9.0)
-- A JSON file containing saved audio tag information
-- A settings file
+- Duplicate search only: a JSON settings file
 
 # Running
+
+## Caching tags
+
+Pass two arguments to TagCacher.fsx:
+1. The directory containing your audio file
+2. The file that contains (or will contain) your cached audio tags (It need not exist yet)
+
+
+```sh
+dotnet fsi TagCacher.fsx "/Users/me/Documents/Audio" "/Users/me/Documents/Audio/tagCache.json"
+```
+
+If the specified file already exists, it will automatically be backed up in the same directory.
+
+## Finding duplicates
 
 First, you must already have a JSON file that contains the tag data that you wish to examine, and it must in this format:
 
