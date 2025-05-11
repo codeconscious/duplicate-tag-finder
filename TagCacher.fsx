@@ -1,6 +1,7 @@
 #r "nuget: TagLibSharp"
 #r "nuget: FsToolkit.ErrorHandling"
 #r "nuget: FSharp.Data"
+#r "nuget: CodeConscious.Startwatch, 1.0.0"
 
 open System
 open System.Globalization
@@ -8,6 +9,8 @@ open FSharp.Data
 open FsToolkit.ErrorHandling
 open System
 open System.IO
+
+type Startwatch = Startwatch.Library.Watch
 
 module Utilities =
     let extractText (x: Runtime.BaseTypes.IJsonDocument) =
@@ -169,8 +172,12 @@ let run =
         File.WriteAllText(cachedTagFileInfo.FullName, newJson)
     }
 
+let watch = Startwatch()
 match run with
-| Ok _ -> 0
+| Ok _ ->
+    printfn $"Done in {watch.ElapsedFriendly}"
+    0
 | Error e ->
-    printfn "%A" e
+    printfn "ERROR: %A" e
+    printfn $"Done in {watch.ElapsedFriendly}"
     1
