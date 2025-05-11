@@ -143,12 +143,16 @@ let run =
         let! fileInfos = getFileInfos fsi.CommandLineArgs[1]
         let cachedTagFileInfo = FileInfo fsi.CommandLineArgs[2]
 
-        let cachedTagJson = System.IO.File.ReadAllText cachedTagFileInfo.FullName
-        let cachedTags: JsonProvider<tagSample>.Root array = getCachedData cachedTagJson
         let cachedTagMap =
-            cachedTags
-            |> Array.map (fun t -> Path.Combine [| extractText t.DirectoryName; extractText t.FileNameOnly |], t)
-            |> Map.ofArray
+            if cachedTagFileInfo.Exists
+            then
+                let cachedTagJson = System.IO.File.ReadAllText cachedTagFileInfo.FullName
+                let cachedTags: JsonProvider<tagSample>.Root array = getCachedData cachedTagJson
+                cachedTags
+                |> Array.map (fun t -> Path.Combine [| extractText t.DirectoryName; extractText t.FileNameOnly |], t)
+                |> Map.ofArray
+            else
+                Map.empty
 
         let newTags = fileInfos |> compareWithCachedTags cachedTagMap
         let options = JsonSerializerOptions()
@@ -157,8 +161,10 @@ let run =
         let newJson = JsonSerializer.Serialize(newTags, options)
 
         // Back up the old file.
-        let backUpFileName = Path.GetFileNameWithoutExtension cachedTagFileInfo.Name + "-" + DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss" + cachedTagFileInfo.Extension
-        cachedTagFileInfo.CopyTo(Path.Combine(cachedTagFileInfo.DirectoryName, backUpFileName)) |> ignore
+        if cachedTagFileInfo.Exists
+        then
+            let backUpFileName = Path.GetFileNameWithoutExtension cachedTagFileInfo.Name + "-" + DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss" + cachedTagFileInfo.Extension
+            cachedTagFileInfo.CopyTo(Path.Combine(cachedTagFileInfo.DirectoryName, backUpFileName)) |> ignore
 
         File.WriteAllText(cachedTagFileInfo.FullName, newJson)
     }
