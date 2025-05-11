@@ -12,6 +12,7 @@ open System.IO
 type Errors =
     | InvalidArgCount
     | MediaDirectoryMissing
+    | IoError of string
 
 module ArgValidation =
     let validate =
@@ -40,10 +41,12 @@ module Files =
             [".mp3"; ".m4a"; ".mp4"; ".ogg"; ".flac"]
             |> List.contains fileInfo.Extension
 
-        // TODO: Add try block.
-        dirPath.EnumerateFiles("*", SearchOption.AllDirectories)
-        |> Seq.filter isSupportedAudioFile
-        |> Ok
+        try
+            dirPath.EnumerateFiles("*", SearchOption.AllDirectories)
+            |> Seq.filter isSupportedAudioFile
+            |> Ok
+        with
+        | e -> Error (IoError e.Message)
 
     let readFileTags (filePath: string) : TagLib.File =
         TagLib.File.Create filePath
