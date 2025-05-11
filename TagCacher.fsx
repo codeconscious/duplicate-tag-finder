@@ -42,8 +42,6 @@ module Files =
         TagLib.File.Create filePath
 
 module Tags =
-    open Utilities
-
     type FileTags =
         { FileNameOnly: string
           DirectoryName: string
@@ -140,13 +138,13 @@ let compareWithCachedTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>
             else cachedTagInfoToNew thisFileTags
         else createTagEntry fileInfo)
 
-let doIt =
+let run =
     result {
         let! fileInfos = getFileInfos fsi.CommandLineArgs[1]
-        let cachedTagJsonPath = fsi.CommandLineArgs[2]
+        let cachedTagFileInfo = FileInfo fsi.CommandLineArgs[2]
 
-        let cachedTagJson = System.IO.File.ReadAllText cachedTagJsonPath
-        let cachedTags: JsonProvider<tagSample>.Root array = CachedTags.Parse cachedTagJson
+        let cachedTagJson = System.IO.File.ReadAllText cachedTagFileInfo.FullName
+        let cachedTags: JsonProvider<tagSample>.Root array = getCachedData cachedTagJson
         let cachedTagMap =
             cachedTags
             |> Array.map (fun t -> Path.Combine [| extractText t.DirectoryName; extractText t.FileNameOnly |], t)
@@ -158,12 +156,14 @@ let doIt =
         options.Encoder <- JavaScriptEncoder.Create UnicodeRanges.All
         let newJson = JsonSerializer.Serialize(newTags, options)
 
-        let tempPath = Path.GetTempPath()
-        printfn "Temp path: %s" tempPath
-        File.WriteAllText(Path.Combine(tempPath, "test.json"), newJson)
+        // Back up the old file.
+        let backUpFileName = Path.GetFileNameWithoutExtension cachedTagFileInfo.Name + "-" + DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss" + cachedTagFileInfo.Extension
+        cachedTagFileInfo.CopyTo(Path.Combine(cachedTagFileInfo.DirectoryName, backUpFileName)) |> ignore
+
+        File.WriteAllText(cachedTagFileInfo.FullName, newJson)
     }
 
-match doIt with
+match run with
 | Ok _ -> 0
 | Error e ->
     printfn "%A" e
