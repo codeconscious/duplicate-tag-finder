@@ -26,7 +26,7 @@ module Files =
 
     let getFileInfos dirPath =
         let isSupportedAudioFile (fileInfo: FileInfo) =
-            [".mp3"; ".m4a"; "mp4"; ".ogg"; ".flac"]
+            [".mp3"; ".m4a"; ".mp4"; ".ogg"; ".flac"]
             |> List.contains fileInfo.Extension
 
         // TODO: Add try block.
@@ -55,7 +55,7 @@ module Tags =
           Year: uint
           Genres: string array
           Duration: TimeSpan
-          LastWriteTime: DateTime }
+          LastWriteTime: DateTimeOffset }
 
     [<Literal>]
     let tagSample = """
@@ -103,7 +103,7 @@ let compareWithCachedTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>
               Year = 0u
               Genres = [|String.Empty|]
               Duration = TimeSpan.Zero
-              LastWriteTime = fileInfo.LastWriteTime }
+              LastWriteTime = DateTimeOffset fileInfo.LastWriteTime }
         else
             { FileNameOnly = fileInfo.Name
               DirectoryName = fileInfo.DirectoryName
@@ -115,7 +115,7 @@ let compareWithCachedTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>
               Year = newestTags.Tag.Year
               Genres = newestTags.Tag.Genres
               Duration = newestTags.Properties.Duration
-              LastWriteTime = fileInfo.LastWriteTime }
+              LastWriteTime = DateTimeOffset fileInfo.LastWriteTime }
 
     let cachedTagInfoToNew (cached: JsonProvider<tagSample>.Root) =
         { FileNameOnly = cached.FileNameOnly |> extractText
@@ -128,7 +128,7 @@ let compareWithCachedTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>
           Year = uint cached.Year
           Genres = cached.Genres |> Array.map extractText
           Duration = cached.Duration
-          LastWriteTime = cached.LastWriteTime.DateTime }
+          LastWriteTime = DateTimeOffset cached.LastWriteTime.DateTime }
 
     fileInfos
     |> Seq.map (fun fileInfo ->
