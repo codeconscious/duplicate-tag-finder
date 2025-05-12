@@ -37,7 +37,7 @@ module Utilities =
     let formatWithCommas (i: int) =
         i.ToString("N0", CultureInfo.InvariantCulture)
 
-module Files =
+module IO =
     let getFileInfos (dirPath: DirectoryInfo) =
         let isSupportedAudioFile (fileInfo: FileInfo) =
             [".mp3"; ".m4a"; ".mp4"; ".ogg"; ".flac"]
@@ -52,6 +52,13 @@ module Files =
 
     let readFileTags (filePath: string) : TaggedFile =
         TagLib.File.Create filePath
+
+    let createBackUpFilePath (fileInfo: FileInfo) =
+        let baseName = Path.GetFileNameWithoutExtension fileInfo.Name
+        let timestamp = DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss"
+        let extension = fileInfo.Extension
+        let fileName = sprintf "%s-%s%s" baseName timestamp extension
+        Path.Combine(fileInfo.DirectoryName, fileName)
 
 module Tags =
     type FileTags =
@@ -90,7 +97,7 @@ module Tags =
     let getCachedData filePath =
         CachedTags.Parse filePath
 
-open Files
+open IO
 open Tags
 open Utilities
 open System.Text.Json
@@ -98,7 +105,7 @@ open System.Text.Encodings.Web
 open System.Text.Unicode
 
 let compareWithCachedTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>) (fileInfos: seq<FileInfo>) =
-    let createTagEntry (fileInfo: FileInfo) =
+    let createNewTagData (fileInfo: FileInfo) =
         let newestTags = readFileTags fileInfo.FullName
 
         if newestTags.Tag = null
@@ -127,7 +134,7 @@ let compareWithCachedTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>
               Duration = newestTags.Properties.Duration
               LastWriteTime = DateTimeOffset fileInfo.LastWriteTime }
 
-    let cachedTagInfoToNew (cached: JsonProvider<tagSample>.Root) =
+    let useExistingTagData (cached: JsonProvider<tagSample>.Root) =
         { FileNameOnly = cached.FileNameOnly |> extractText
           DirectoryName = cached.DirectoryName |> extractText
           Artists = cached.Artists |> Array.map extractText
@@ -142,13 +149,13 @@ let compareWithCachedTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>
 
     fileInfos
     |> Seq.map (fun fileInfo ->
-        if Map.containsKey fileInfo.FullName cachedTags // TODO: Redo using tryFind, etc.
+        if Map.containsKey fileInfo.FullName cachedTags
         then
-            let thisFileTags = Map.find fileInfo.FullName cachedTags
-            if thisFileTags.LastWriteTime.DateTime < fileInfo.LastWriteTime
-            then createTagEntry fileInfo
-            else cachedTagInfoToNew thisFileTags
-        else createTagEntry fileInfo)
+            let fileCachedTags = Map.find fileInfo.FullName cachedTags
+            if fileCachedTags.LastWriteTime.DateTime < fileInfo.LastWriteTime
+            then createNewTagData fileInfo
+            else useExistingTagData fileCachedTags
+        else createNewTagData fileInfo)
 
 let run () =
     result {
@@ -166,17 +173,17 @@ let run () =
             else
                 Map.empty
 
-        let newTags = fileInfos |> compareWithCachedTags cachedTagMap
-        let options = JsonSerializerOptions()
-        options.WriteIndented <- true
-        options.Encoder <- JavaScriptEncoder.Create UnicodeRanges.All
-        let newJson = JsonSerializer.Serialize(newTags, options)
+        let updatedTags = fileInfos |> compareWithCachedTags cachedTagMap
+
+        let serializerOptions = JsonSerializerOptions()
+        serializerOptions.WriteIndented <- true
+        serializerOptions.Encoder <- JavaScriptEncoder.Create UnicodeRanges.All
+        let newJson = JsonSerializer.Serialize(updatedTags, serializerOptions)
 
         // Back up the old file.
-        if cachedTagFile.Exists
-        then
-            let backUpFileName = Path.GetFileNameWithoutExtension cachedTagFile.Name + "-" + DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss" + cachedTagFile.Extension
-            cachedTagFile.CopyTo(Path.Combine(cachedTagFile.DirectoryName, backUpFileName)) |> ignore
+        if cachedTagFile.Exists then
+            let backedUpFile = cachedTagFile.CopyTo(createBackUpFilePath cachedTagFile)
+            printfn "Backed up previous cached tags to \"%s\"." backedUpFile.Name
 
         File.WriteAllText(cachedTagFile.FullName, newJson)
     }
@@ -188,5 +195,5 @@ match run () with
     0
 | Error e ->
     printfn "ERROR: %A" e
-    printfn $"Done in {watch.ElapsedFriendly}"
+    printfn $"Failed after {watch.ElapsedFriendly}"
     1
