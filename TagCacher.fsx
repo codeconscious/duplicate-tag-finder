@@ -107,13 +107,15 @@ module Tags =
             LastWriteTime: DateTimeOffset
         }
 
-    type TagCheckResult =
-        | NoChange of FileTags
-        | Updated of FileTags
-        | Created of FileTags
+    type CheckResult =
+        | NoChange
+        | Updated
+        | Added
+
+    type CheckResultWithTags = CheckResult * FileTags
 
     [<Literal>]
-    let tagSample = """
+    let private tagSample = """
     [
       {
         "FileNameOnly": "",
@@ -138,7 +140,11 @@ module Tags =
     let audioFilePath (tags: JsonProvider<tagSample>.Root) =
         Path.Combine [| extractText tags.DirectoryName; extractText tags.FileNameOnly |]
 
-    let compareAndUpdateTagData (cachedTags: Map<string, JsonProvider<tagSample>.Root>) (fileInfos: FileInfo seq) : seq<TagCheckResult> =
+    let compareAndUpdateTagData
+        (cachedTags: Map<string, JsonProvider<tagSample>.Root>)
+        (fileInfos: FileInfo seq)
+        : CheckResultWithTags seq
+        =
         let createNewTagData (fileInfo: FileInfo) =
             let newestTags = readFileTags fileInfo.FullName
 
@@ -187,30 +193,30 @@ module Tags =
                 LastWriteTime = DateTimeOffset cached.LastWriteTime.DateTime
             }
 
-        let updateTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>) (fileInfo: FileInfo) : TagCheckResult =
+        let updateTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>) (fileInfo: FileInfo) : CheckResultWithTags =
             if Map.containsKey fileInfo.FullName cachedTags
             then
                 let fileCachedTags = Map.find fileInfo.FullName cachedTags
                 if fileCachedTags.LastWriteTime.DateTime < fileInfo.LastWriteTime
-                then Updated (createNewTagData fileInfo)
-                else NoChange (useExistingTagData fileCachedTags)
-            else Created (createNewTagData fileInfo)
+                then Updated, (createNewTagData fileInfo)
+                else NoChange, (useExistingTagData fileCachedTags)
+            else Added, (createNewTagData fileInfo)
 
         fileInfos
         |> Seq.map (fun fileInfo -> updateTags cachedTags fileInfo)
 
-    let reportResults (results: TagCheckResult seq) =
-        let initialCounts = {| New = 0; Updated = 0; NoChange = 0 |}
+    let reportResults (results: CheckResultWithTags seq) =
+        let initialCounts = {| Added = 0; Updated = 0; NoChange = 0 |}
         let totals =
-            (initialCounts, results)
+            (initialCounts, results |> Seq.map fst)
             ||> Seq.fold (fun acc r ->
                 match r with
-                | Created _ -> {| acc with New = acc.New + 1 |}
-                | Updated _ -> {| acc with New = acc.New + 1 |}
-                | NoChange _ -> {| acc with NoChange = acc.NoChange + 1 |})
+                | Added -> {| acc with Added = acc.Added + 1 |}
+                | Updated -> {| acc with Updated = acc.Updated + 1 |}
+                | NoChange -> {| acc with NoChange = acc.NoChange + 1 |})
 
         printfn "Results:"
-        printfn "• Created:  %d" totals.New
+        printfn "• Created:  %d" totals.Added
         printfn "• Updated:  %d" totals.Updated
         printfn "• NoChange: %d" totals.NoChange
 
@@ -241,11 +247,7 @@ let run () =
             fileInfos
             |> compareAndUpdateTagData cachedTagMap
             |> reportResults
-            |> Seq.map (fun r ->
-                match r with
-                | Created c -> c
-                | Updated u -> u
-                | NoChange n -> n)
+            |> Seq.map snd
             |> serializeToJson
 
         // Back up the old file.
