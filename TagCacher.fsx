@@ -27,6 +27,9 @@ module ArgValidation =
             else Ok (mediaDir, cachedTagFile)
 
 module Utilities =
+    open System.Text.Json
+    open System.Text.Encodings.Web
+    open System.Text.Unicode
     let extractText (x: Runtime.BaseTypes.IJsonDocument) =
         x.JsonValue.InnerText()
 
@@ -37,7 +40,15 @@ module Utilities =
     let formatWithCommas (i: int) =
         i.ToString("N0", CultureInfo.InvariantCulture)
 
+    let serializeToJson items =
+        let serializerOptions = JsonSerializerOptions()
+        serializerOptions.WriteIndented <- true
+        serializerOptions.Encoder <- JavaScriptEncoder.Create UnicodeRanges.All
+        JsonSerializer.Serialize(items, serializerOptions)
+
 module IO =
+    open Utilities
+
     let getFileInfos (dirPath: DirectoryInfo) =
         let isSupportedAudioFile (fileInfo: FileInfo) =
             [".mp3"; ".m4a"; ".mp4"; ".ogg"; ".flac"]
@@ -60,7 +71,17 @@ module IO =
         let fileName = sprintf "%s-%s%s" baseName timestamp extension
         Path.Combine(fileInfo.DirectoryName, fileName)
 
+    let writeFile (fileName: string) (content: string) =
+        try
+            File.WriteAllText(fileName, content)
+            |> Ok
+        with
+        | e -> Error (IoError e.Message)
+
 module Tags =
+    open IO
+    open Utilities
+
     type FileTags =
         { FileNameOnly: string
           DirectoryName: string
@@ -94,8 +115,70 @@ module Tags =
 
     type CachedTags = JsonProvider<tagSample>
 
-    let getCachedData filePath =
+    let parseCachedTagData filePath =
         CachedTags.Parse filePath
+
+    let audioFilePath (tags: JsonProvider<tagSample>.Root) =
+        Path.Combine [| extractText tags.DirectoryName; extractText tags.FileNameOnly |]
+
+    let compareAndUpdateTagData (cachedTags: Map<string, JsonProvider<tagSample>.Root>) (fileInfos: FileInfo seq) =
+        let createNewTagData (fileInfo: FileInfo) =
+            let newestTags = readFileTags fileInfo.FullName
+
+            if newestTags.Tag = null
+            then
+                {
+                    FileNameOnly = fileInfo.Name
+                    DirectoryName = fileInfo.DirectoryName
+                    Artists = [|String.Empty|]
+                    AlbumArtists = [|String.Empty|]
+                    Album = String.Empty
+                    TrackNo = 0u
+                    Title = String.Empty
+                    Year = 0u
+                    Genres = [|String.Empty|]
+                    Duration = TimeSpan.Zero
+                    LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
+                }
+            else
+                {
+                    FileNameOnly = fileInfo.Name
+                    DirectoryName = fileInfo.DirectoryName
+                    Artists = if newestTags.Tag.Performers = null then [|String.Empty|] else newestTags.Tag.Performers |> Array.map (fun p -> p.Normalize())
+                    AlbumArtists = if newestTags.Tag.AlbumArtists = null then [|String.Empty|] else newestTags.Tag.AlbumArtists |> Array.map (fun p -> p.Normalize())
+                    Album = if newestTags.Tag.Album = null then String.Empty else newestTags.Tag.Album.Normalize()
+                    TrackNo = newestTags.Tag.Track
+                    Title = newestTags.Tag.Title
+                    Year = newestTags.Tag.Year
+                    Genres = newestTags.Tag.Genres
+                    Duration = newestTags.Properties.Duration
+                    LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
+                }
+
+        let useExistingTagData (cached: JsonProvider<tagSample>.Root) =
+            {
+                FileNameOnly = cached.FileNameOnly |> extractText
+                DirectoryName = cached.DirectoryName |> extractText
+                Artists = cached.Artists |> Array.map extractText
+                AlbumArtists = cached.AlbumArtists |> Array.map extractText
+                Album = cached.Album |> extractText
+                TrackNo = uint cached.TrackNo
+                Title = cached.Title |> extractText
+                Year = uint cached.Year
+                Genres = cached.Genres |> Array.map extractText
+                Duration = cached.Duration
+                LastWriteTime = DateTimeOffset cached.LastWriteTime.DateTime
+            }
+
+        fileInfos
+        |> Seq.map (fun fileInfo ->
+            if Map.containsKey fileInfo.FullName cachedTags
+            then
+                let fileCachedTags = Map.find fileInfo.FullName cachedTags
+                if fileCachedTags.LastWriteTime.DateTime < fileInfo.LastWriteTime
+                then createNewTagData fileInfo
+                else useExistingTagData fileCachedTags
+            else createNewTagData fileInfo)
 
 open IO
 open Tags
@@ -103,59 +186,6 @@ open Utilities
 open System.Text.Json
 open System.Text.Encodings.Web
 open System.Text.Unicode
-
-let compareWithCachedTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>) (fileInfos: seq<FileInfo>) =
-    let createNewTagData (fileInfo: FileInfo) =
-        let newestTags = readFileTags fileInfo.FullName
-
-        if newestTags.Tag = null
-        then
-            { FileNameOnly = fileInfo.Name
-              DirectoryName = fileInfo.DirectoryName
-              Artists = [|String.Empty|]
-              AlbumArtists = [|String.Empty|]
-              Album = String.Empty
-              TrackNo = 0u
-              Title = String.Empty
-              Year = 0u
-              Genres = [|String.Empty|]
-              Duration = TimeSpan.Zero
-              LastWriteTime = DateTimeOffset fileInfo.LastWriteTime }
-        else
-            { FileNameOnly = fileInfo.Name
-              DirectoryName = fileInfo.DirectoryName
-              Artists = if newestTags.Tag.Performers = null then [|String.Empty|] else newestTags.Tag.Performers |> Array.map (fun p -> p.Normalize())
-              AlbumArtists = if newestTags.Tag.AlbumArtists = null then [|String.Empty|] else newestTags.Tag.AlbumArtists |> Array.map (fun p -> p.Normalize())
-              Album = if newestTags.Tag.Album = null then String.Empty else newestTags.Tag.Album.Normalize()
-              TrackNo = newestTags.Tag.Track
-              Title = newestTags.Tag.Title
-              Year = newestTags.Tag.Year
-              Genres = newestTags.Tag.Genres
-              Duration = newestTags.Properties.Duration
-              LastWriteTime = DateTimeOffset fileInfo.LastWriteTime }
-
-    let useExistingTagData (cached: JsonProvider<tagSample>.Root) =
-        { FileNameOnly = cached.FileNameOnly |> extractText
-          DirectoryName = cached.DirectoryName |> extractText
-          Artists = cached.Artists |> Array.map extractText
-          AlbumArtists = cached.AlbumArtists |> Array.map extractText
-          Album = cached.Album |> extractText
-          TrackNo = uint cached.TrackNo
-          Title = cached.Title |> extractText
-          Year = uint cached.Year
-          Genres = cached.Genres |> Array.map extractText
-          Duration = cached.Duration
-          LastWriteTime = DateTimeOffset cached.LastWriteTime.DateTime }
-
-    fileInfos
-    |> Seq.map (fun fileInfo ->
-        if Map.containsKey fileInfo.FullName cachedTags
-        then
-            let fileCachedTags = Map.find fileInfo.FullName cachedTags
-            if fileCachedTags.LastWriteTime.DateTime < fileInfo.LastWriteTime
-            then createNewTagData fileInfo
-            else useExistingTagData fileCachedTags
-        else createNewTagData fileInfo)
 
 let run () =
     result {
@@ -165,27 +195,25 @@ let run () =
         let cachedTagMap =
             if cachedTagFile.Exists
             then
-                let cachedTagJson = System.IO.File.ReadAllText cachedTagFile.FullName
-                let cachedTags: JsonProvider<tagSample>.Root array = getCachedData cachedTagJson
-                cachedTags
-                |> Array.map (fun t -> Path.Combine [| extractText t.DirectoryName; extractText t.FileNameOnly |], t)
+                cachedTagFile.FullName
+                |> System.IO.File.ReadAllText
+                |> parseCachedTagData
+                |> Array.map (fun tags -> audioFilePath tags, tags)
                 |> Map.ofArray
             else
                 Map.empty
 
-        let updatedTags = fileInfos |> compareWithCachedTags cachedTagMap
-
-        let serializerOptions = JsonSerializerOptions()
-        serializerOptions.WriteIndented <- true
-        serializerOptions.Encoder <- JavaScriptEncoder.Create UnicodeRanges.All
-        let newJson = JsonSerializer.Serialize(updatedTags, serializerOptions)
+        let newJson =
+            fileInfos
+            |> compareAndUpdateTagData cachedTagMap
+            |> serializeToJson
 
         // Back up the old file.
         if cachedTagFile.Exists then
             let backedUpFile = cachedTagFile.CopyTo(createBackUpFilePath cachedTagFile)
             printfn "Backed up previous cached tags to \"%s\"." backedUpFile.Name
 
-        File.WriteAllText(cachedTagFile.FullName, newJson)
+        do! writeFile cachedTagFile.FullName newJson
     }
 
 let watch = Startwatch.Library.Watch()
