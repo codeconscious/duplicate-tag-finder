@@ -182,15 +182,17 @@ module Tags =
                 LastWriteTime = DateTimeOffset cached.LastWriteTime.DateTime
             }
 
-        fileInfos
-        |> Seq.map (fun fileInfo ->
+        let update (cachedTags: Map<string, JsonProvider<tagSample>.Root>) (fileInfo: FileInfo) : FileTags =
             if Map.containsKey fileInfo.FullName cachedTags
             then
                 let fileCachedTags = Map.find fileInfo.FullName cachedTags
                 if fileCachedTags.LastWriteTime.DateTime < fileInfo.LastWriteTime
                 then createNewTagData fileInfo
                 else useExistingTagData fileCachedTags
-            else createNewTagData fileInfo)
+            else createNewTagData fileInfo
+
+        fileInfos
+        |> Seq.map (fun fileInfo -> update cachedTags fileInfo)
 
 open Errors
 open IO
