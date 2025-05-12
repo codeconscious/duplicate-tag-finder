@@ -74,19 +74,32 @@ module IO =
     let readFileTags (filePath: string) : TaggedFile =
         TagLib.File.Create filePath
 
-    let createBackUpFilePath (fileInfo: FileInfo) =
-        let baseName = Path.GetFileNameWithoutExtension fileInfo.Name
-        let timestamp = DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss"
-        let extension = fileInfo.Extension // Includes the initial period.
-        let fileName = sprintf "%s-%s%s" baseName timestamp extension
-        Path.Combine(fileInfo.DirectoryName, fileName)
-
     let writeFile (fileName: string) (content: string) =
         try
             File.WriteAllText(fileName, content)
             |> Ok
         with
         | e -> Error (IoError e.Message)
+
+    let createBackUpFilePath (cachedTagFile: FileInfo) =
+        let baseName = Path.GetFileNameWithoutExtension cachedTagFile.Name
+        let timestamp = DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss"
+        let extension = cachedTagFile.Extension // Includes the initial period.
+        let fileName = sprintf "%s-%s%s" baseName timestamp extension
+        Path.Combine(cachedTagFile.DirectoryName, fileName)
+
+    let writeBackupFile (cachedTagFile: FileInfo) =
+        if cachedTagFile.Exists
+        then
+            try
+                cachedTagFile
+                |> createBackUpFilePath
+                |> cachedTagFile.CopyTo
+                |> Some
+                |> Ok
+            with
+            | e -> Error (IoError $"Could not create backup file: {e.Message}")
+        else Ok None
 
 module Tags =
     open IO
@@ -250,10 +263,8 @@ let run () =
             |> Seq.map snd
             |> serializeToJson
 
-        // Back up the old file.
-        if cachedTagFile.Exists then
-            let backedUpFile = cachedTagFile.CopyTo(createBackUpFilePath cachedTagFile)
-            printfn "Backed up previous cached tags to \"%s\"." backedUpFile.Name
+        let! backUpFile = writeBackupFile cachedTagFile
+        backUpFile |> Option.iter (fun file -> printfn "Backed up previous tag file to \"%s\"." file.Name)
 
         do! writeFile cachedTagFile.FullName newJson
     }
@@ -262,9 +273,9 @@ let watch = Startwatch.Library.Watch()
 
 match run () with
 | Ok _ ->
-    printfn $"Done in {watch.ElapsedFriendly}"
+    printfn $"Done in {watch.ElapsedFriendly}."
     0
 | Error e ->
     printfn "%s" (message e)
-    printfn $"Failed after {watch.ElapsedFriendly}"
+    printfn $"Failed after {watch.ElapsedFriendly}."
     1
