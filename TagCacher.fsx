@@ -11,25 +11,35 @@ open System.IO
 
 type TaggedFile = TagLib.File
 
-type Errors =
-    | InvalidArgCount
-    | MediaDirectoryMissing
-    | IoError of string
+module Errors =
+    type Errors =
+        | InvalidArgCount
+        | MediaDirectoryMissing of string
+        | IoError of string
+
+    let message = function
+        | InvalidArgCount -> "Invalid arguments. Pass in (1) the directory containing audio files and (2) a path to a JSON file containing cached tag data."
+        | MediaDirectoryMissing e -> $"The directory \"{e}\" was not found."
+        | IoError e -> $"I/O failure: {e}"
 
 module ArgValidation =
+    open Errors
+
     let validate =
-        if fsi.CommandLineArgs.Length <> 3 // Index 0 is the stript nameof.
+        if fsi.CommandLineArgs.Length <> 3 // Index 0 is the name of the script itself.
         then Error InvalidArgCount
         else
             let mediaDir, cachedTagFile = DirectoryInfo fsi.CommandLineArgs[1], FileInfo fsi.CommandLineArgs[2]
+
             if not mediaDir.Exists
-            then Error MediaDirectoryMissing
+            then Error (MediaDirectoryMissing mediaDir.FullName)
             else Ok (mediaDir, cachedTagFile)
 
 module Utilities =
     open System.Text.Json
     open System.Text.Encodings.Web
     open System.Text.Unicode
+
     let extractText (x: Runtime.BaseTypes.IJsonDocument) =
         x.JsonValue.InnerText()
 
@@ -47,7 +57,7 @@ module Utilities =
         JsonSerializer.Serialize(items, serializerOptions)
 
 module IO =
-    open Utilities
+    open Errors
 
     let getFileInfos (dirPath: DirectoryInfo) =
         let isSupportedAudioFile (fileInfo: FileInfo) =
@@ -67,7 +77,7 @@ module IO =
     let createBackUpFilePath (fileInfo: FileInfo) =
         let baseName = Path.GetFileNameWithoutExtension fileInfo.Name
         let timestamp = DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss"
-        let extension = fileInfo.Extension
+        let extension = fileInfo.Extension // Includes the initial period.
         let fileName = sprintf "%s-%s%s" baseName timestamp extension
         Path.Combine(fileInfo.DirectoryName, fileName)
 
@@ -83,17 +93,19 @@ module Tags =
     open Utilities
 
     type FileTags =
-        { FileNameOnly: string
-          DirectoryName: string
-          Artists: string array
-          AlbumArtists: string array
-          Album: string
-          TrackNo: uint
-          Title: string
-          Year: uint
-          Genres: string array
-          Duration: TimeSpan
-          LastWriteTime: DateTimeOffset }
+        {
+            FileNameOnly: string
+            DirectoryName: string
+            Artists: string array
+            AlbumArtists: string array
+            Album: string
+            TrackNo: uint
+            Title: string
+            Year: uint
+            Genres: string array
+            Duration: TimeSpan
+            LastWriteTime: DateTimeOffset
+        }
 
     [<Literal>]
     let tagSample = """
@@ -180,12 +192,10 @@ module Tags =
                 else useExistingTagData fileCachedTags
             else createNewTagData fileInfo)
 
+open Errors
 open IO
 open Tags
 open Utilities
-open System.Text.Json
-open System.Text.Encodings.Web
-open System.Text.Unicode
 
 let run () =
     result {
@@ -217,11 +227,12 @@ let run () =
     }
 
 let watch = Startwatch.Library.Watch()
+
 match run () with
 | Ok _ ->
     printfn $"Done in {watch.ElapsedFriendly}"
     0
 | Error e ->
-    printfn "ERROR: %A" e
+    printfn "%s" (message e)
     printfn $"Failed after {watch.ElapsedFriendly}"
     1
