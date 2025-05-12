@@ -9,6 +9,8 @@ open FSharp.Data
 open FsToolkit.ErrorHandling
 open System.IO
 
+type TaggedFile = TagLib.File
+
 type Errors =
     | InvalidArgCount
     | MediaDirectoryMissing
@@ -48,7 +50,7 @@ module Files =
         with
         | e -> Error (IoError e.Message)
 
-    let readFileTags (filePath: string) : TagLib.File =
+    let readFileTags (filePath: string) : TaggedFile =
         TagLib.File.Create filePath
 
 module Tags =
