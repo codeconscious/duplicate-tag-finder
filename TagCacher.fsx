@@ -107,6 +107,11 @@ module Tags =
             LastWriteTime: DateTimeOffset
         }
 
+    type TagCheckResult =
+        | NoChange of FileTags
+        | Updated of FileTags
+        | Created of FileTags
+
     [<Literal>]
     let tagSample = """
     [
@@ -133,7 +138,7 @@ module Tags =
     let audioFilePath (tags: JsonProvider<tagSample>.Root) =
         Path.Combine [| extractText tags.DirectoryName; extractText tags.FileNameOnly |]
 
-    let compareAndUpdateTagData (cachedTags: Map<string, JsonProvider<tagSample>.Root>) (fileInfos: FileInfo seq) =
+    let compareAndUpdateTagData (cachedTags: Map<string, JsonProvider<tagSample>.Root>) (fileInfos: FileInfo seq) : seq<TagCheckResult> =
         let createNewTagData (fileInfo: FileInfo) =
             let newestTags = readFileTags fileInfo.FullName
 
@@ -182,17 +187,34 @@ module Tags =
                 LastWriteTime = DateTimeOffset cached.LastWriteTime.DateTime
             }
 
-        let update (cachedTags: Map<string, JsonProvider<tagSample>.Root>) (fileInfo: FileInfo) : FileTags =
+        let updateTags (cachedTags: Map<string, JsonProvider<tagSample>.Root>) (fileInfo: FileInfo) : TagCheckResult =
             if Map.containsKey fileInfo.FullName cachedTags
             then
                 let fileCachedTags = Map.find fileInfo.FullName cachedTags
                 if fileCachedTags.LastWriteTime.DateTime < fileInfo.LastWriteTime
-                then createNewTagData fileInfo
-                else useExistingTagData fileCachedTags
-            else createNewTagData fileInfo
+                then Updated (createNewTagData fileInfo)
+                else NoChange (useExistingTagData fileCachedTags)
+            else Created (createNewTagData fileInfo)
 
         fileInfos
-        |> Seq.map (fun fileInfo -> update cachedTags fileInfo)
+        |> Seq.map (fun fileInfo -> updateTags cachedTags fileInfo)
+
+    let reportResults (results: TagCheckResult seq) =
+        let initialCounts = {| New = 0; Updated = 0; NoChange = 0 |}
+        let totals =
+            (initialCounts, results)
+            ||> Seq.fold (fun acc r ->
+                match r with
+                | Created _ -> {| acc with New = acc.New + 1 |}
+                | Updated _ -> {| acc with New = acc.New + 1 |}
+                | NoChange _ -> {| acc with NoChange = acc.NoChange + 1 |})
+
+        printfn "Results:"
+        printfn "• Created:  %d" totals.New
+        printfn "• Updated:  %d" totals.Updated
+        printfn "• NoChange: %d" totals.NoChange
+
+        results
 
 open Errors
 open IO
@@ -218,6 +240,12 @@ let run () =
         let newJson =
             fileInfos
             |> compareAndUpdateTagData cachedTagMap
+            |> reportResults
+            |> Seq.map (fun r ->
+                match r with
+                | Created c -> c
+                | Updated u -> u
+                | NoChange n -> n)
             |> serializeToJson
 
         // Back up the old file.
