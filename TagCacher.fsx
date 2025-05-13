@@ -81,20 +81,25 @@ module IO =
         with
         | e -> Error (IoError e.Message)
 
-    let createBackUpFilePath (cachedTagFile: FileInfo) =
+    let generateBackUpFilePath (cachedTagFile: FileInfo) =
         let baseName = Path.GetFileNameWithoutExtension cachedTagFile.Name
         let timestamp = DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss"
         let extension = cachedTagFile.Extension // Includes the initial period.
         let fileName = sprintf "%s-%s%s" baseName timestamp extension
         Path.Combine(cachedTagFile.DirectoryName, fileName)
 
-    let writeBackupFile (cachedTagFile: FileInfo) =
+    let copyToBackupFile (cachedTagFile: FileInfo) =
+        let printConfirmation (file: FileInfo) =
+            printfn "Backed up previous tag file to \"%s\"." file.Name
+            file
+
         if cachedTagFile.Exists
         then
             try
                 cachedTagFile
-                |> createBackUpFilePath
+                |> generateBackUpFilePath
                 |> cachedTagFile.CopyTo
+                |> printConfirmation
                 |> Some
                 |> Ok
             with
@@ -121,7 +126,7 @@ module Tags =
         }
 
     type CheckResult =
-        | NoChange
+        | Unchanged
         | Updated
         | Added
 
@@ -153,6 +158,17 @@ module Tags =
 
     let audioFilePath (tags: CachedTags.Root) =
         Path.Combine [| extractText tags.DirectoryName; extractText tags.FileNameOnly |]
+
+    let createCachedTagMap (cachedTagFile: FileInfo) : FileNameWithCachedTags =
+        if cachedTagFile.Exists
+        then
+            cachedTagFile.FullName
+            |> System.IO.File.ReadAllText
+            |> parseCachedTagData
+            |> Array.map (fun tags -> audioFilePath tags, tags)
+            |> Map.ofArray
+        else
+            Map.empty
 
     let compareAndUpdateTagData
         (cachedTags: FileNameWithCachedTags)
@@ -213,7 +229,7 @@ module Tags =
                 let fileCachedTags = Map.find fileInfo.FullName cachedTags
                 if fileCachedTags.LastWriteTime.DateTime < fileInfo.LastWriteTime
                 then Updated, (createNewTagData fileInfo)
-                else NoChange, (useExistingTagData fileCachedTags)
+                else Unchanged, (useExistingTagData fileCachedTags)
             else Added, (createNewTagData fileInfo)
 
         fileInfos
@@ -224,11 +240,11 @@ module Tags =
 
         let totals =
             (initialCounts, results |> Seq.map fst)
-            ||> Seq.fold (fun acc r ->
-                match r with
+            ||> Seq.fold (fun acc result ->
+                match result with
                 | Added -> {| acc with Added = acc.Added + 1 |}
                 | Updated -> {| acc with Updated = acc.Updated + 1 |}
-                | NoChange -> {| acc with Unchanged = acc.Unchanged + 1 |})
+                | Unchanged -> {| acc with Unchanged = acc.Unchanged + 1 |})
 
         printfn "Results:"
         printfn "• Added:     %s" (formatWithCommas totals.Added)
@@ -236,6 +252,13 @@ module Tags =
         printfn "• Unchanged: %s" (formatWithCommas totals.Unchanged)
 
         results
+
+    let generateNewJson (cachedTagMap: FileNameWithCachedTags) (fileInfos: FileInfo seq) =
+        fileInfos
+        |> compareAndUpdateTagData cachedTagMap
+        |> reportResults
+        |> Seq.map snd
+        |> serializeToJson
 
 open Errors
 open IO
@@ -246,28 +269,10 @@ let run () =
     result {
         let! mediaDir, cachedTagFile = ArgValidation.validate
         let! fileInfos = getFileInfos mediaDir
+        let cachedTagMap = createCachedTagMap cachedTagFile
+        let newJson = generateNewJson cachedTagMap fileInfos
 
-        let cachedTagMap =
-            if cachedTagFile.Exists
-            then
-                cachedTagFile.FullName
-                |> System.IO.File.ReadAllText
-                |> parseCachedTagData
-                |> Array.map (fun tags -> audioFilePath tags, tags)
-                |> Map.ofArray
-            else
-                Map.empty
-
-        let newJson =
-            fileInfos
-            |> compareAndUpdateTagData cachedTagMap
-            |> reportResults
-            |> Seq.map snd
-            |> serializeToJson
-
-        let! backUpFile = writeBackupFile cachedTagFile
-        backUpFile |> Option.iter (fun file -> printfn "Backed up previous tag file to \"%s\"." file.Name)
-
+        let! _ = copyToBackupFile cachedTagFile
         do! writeFile cachedTagFile.FullName newJson
     }
 
