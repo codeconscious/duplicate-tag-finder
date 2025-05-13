@@ -89,9 +89,9 @@ module IO =
         Path.Combine(cachedTagFile.DirectoryName, fileName)
 
     let copyToBackupFile (cachedTagFile: FileInfo) =
-        let printConfirmation (file: FileInfo) =
-            printfn "Backed up previous tag file to \"%s\"." file.Name
-            file
+        let printConfirmation (backupFile: FileInfo) =
+            printfn "Backed up previous tag file to \"%s\"." backupFile.Name
+            backupFile
 
         if cachedTagFile.Exists
         then
@@ -183,13 +183,13 @@ module Tags =
                 {
                     FileNameOnly = fileInfo.Name
                     DirectoryName = fileInfo.DirectoryName
-                    Artists = [|String.Empty|]
-                    AlbumArtists = [|String.Empty|]
+                    Artists = [| String.Empty |]
+                    AlbumArtists = [| String.Empty |]
                     Album = String.Empty
                     TrackNo = 0u
                     Title = String.Empty
                     Year = 0u
-                    Genres = [|String.Empty|]
+                    Genres = [| String.Empty |]
                     Duration = TimeSpan.Zero
                     LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
                 }
@@ -197,9 +197,16 @@ module Tags =
                 {
                     FileNameOnly = fileInfo.Name
                     DirectoryName = fileInfo.DirectoryName
-                    Artists = if newestTags.Tag.Performers = null then [|String.Empty|] else newestTags.Tag.Performers |> Array.map (fun p -> p.Normalize())
-                    AlbumArtists = if newestTags.Tag.AlbumArtists = null then [|String.Empty|] else newestTags.Tag.AlbumArtists |> Array.map (fun p -> p.Normalize())
-                    Album = if newestTags.Tag.Album = null then String.Empty else newestTags.Tag.Album.Normalize()
+                    Artists = if newestTags.Tag.Performers = null
+                              then [| String.Empty |]
+                              else newestTags.Tag.Performers
+                                   |> Array.map (fun p -> p.Normalize())
+                    AlbumArtists = if newestTags.Tag.AlbumArtists = null
+                                   then [| String.Empty |]
+                                   else newestTags.Tag.AlbumArtists |> Array.map (fun p -> p.Normalize())
+                    Album = if newestTags.Tag.Album = null
+                            then String.Empty
+                            else newestTags.Tag.Album.Normalize()
                     TrackNo = newestTags.Tag.Track
                     Title = newestTags.Tag.Title
                     Year = newestTags.Tag.Year
@@ -263,7 +270,6 @@ module Tags =
 open Errors
 open IO
 open Tags
-open Utilities
 
 let run () =
     result {
