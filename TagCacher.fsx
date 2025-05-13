@@ -220,7 +220,7 @@ module Tags =
         |> Seq.map (fun fileInfo -> updateTags cachedTags fileInfo)
 
     let reportResults (results: CheckResultWithFileTags seq) =
-        let initialCounts = {| Added = 0; Updated = 0; NoChange = 0 |}
+        let initialCounts = {| Added = 0; Updated = 0; Unchanged = 0 |}
 
         let totals =
             (initialCounts, results |> Seq.map fst)
@@ -228,12 +228,12 @@ module Tags =
                 match r with
                 | Added -> {| acc with Added = acc.Added + 1 |}
                 | Updated -> {| acc with Updated = acc.Updated + 1 |}
-                | NoChange -> {| acc with NoChange = acc.NoChange + 1 |})
+                | NoChange -> {| acc with Unchanged = acc.Unchanged + 1 |})
 
         printfn "Results:"
-        printfn "• Created:  %d" totals.Added
-        printfn "• Updated:  %d" totals.Updated
-        printfn "• NoChange: %d" totals.NoChange
+        printfn "• Added:     %s" (formatWithCommas totals.Added)
+        printfn "• Updated:   %s" (formatWithCommas totals.Updated)
+        printfn "• Unchanged: %s" (formatWithCommas totals.Unchanged)
 
         results
 
