@@ -27,14 +27,12 @@ module Settings =
           Title: string option }
 
     type SettingsType =
-        { CachedTagFile: string
-          Exclusions: ExclusionPair array
+        { Exclusions: ExclusionPair array
           ArtistReplacements: string array
           TitleReplacements: string array }
 
     let private toSettings (settings: Settings.Root) =
-        { CachedTagFile = settings.CachedTagFile
-          Exclusions =
+        { Exclusions =
               settings.Exclusions
               |> Array.map (fun x -> { Artist = x.Artist
                                        Title = x.Title })
@@ -44,7 +42,6 @@ module Settings =
     let load () = Settings.Load settingsPath |> toSettings
 
     let summarize settings =
-        printfn $"Cached Tag File:     %s{settings.CachedTagFile}"
         printfn $"Exclusions:          %d{settings.Exclusions.Length}"
         printfn $"Artist Replacements: %d{settings.ArtistReplacements.Length}"
         printfn $"Title Replacements:  %d{settings.TitleReplacements.Length}"
@@ -137,6 +134,7 @@ module Modifications =
             text
             substrings
 
+open System.IO
 open Settings
 open Tags
 open Utilities
@@ -144,10 +142,17 @@ open Exclusions
 open Modifications
 
 try
+    if fsi.CommandLineArgs.Length <> 2
+    then printfn "Bad arguments!"
+    elif not (File.Exists fsi.CommandLineArgs[1])
+    then printfn "Tag file is missing!"
+
+    let cachedTagFileName = fsi.CommandLineArgs[1] // TODO: Add proper validation.
+
     let settings = Settings.load ()
     summarize settings
 
-    let rawTagJson = System.IO.File.ReadAllText settings.CachedTagFile
+    let rawTagJson = System.IO.File.ReadAllText cachedTagFileName
     let allTags = CachedTags.Parse rawTagJson
     printfn $"Total file count:    %s{formatWithCommas allTags.Length}"
 
