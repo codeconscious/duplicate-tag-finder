@@ -1,9 +1,23 @@
 #r "nuget: FsToolkit.ErrorHandling"
 #r "nuget: FSharp.Data"
+#r "nuget: CodeConscious.Startwatch, 1.0.0"
 
 open System
 open System.Globalization
+open System.IO
 open FSharp.Data
+open FsToolkit.ErrorHandling
+
+module Errors =
+    type Errors =
+        | InvalidArgCount
+        | FileMissing of string
+        | IoError of string
+
+    let message = function
+        | InvalidArgCount -> "Invalid arguments. Pass in the path to the JSON file containing your cached tag data."
+        | FileMissing e -> $"The file \"{e}\" was not found."
+        | IoError e -> $"I/O failure: {e}"
 
 module Utilities =
     let extractText (x: Runtime.BaseTypes.IJsonDocument) =
@@ -16,7 +30,27 @@ module Utilities =
     let formatWithCommas (i: int) =
         i.ToString("N0", CultureInfo.InvariantCulture)
 
+    let removeSubstrings (substrings: string array) (text: string) : string =
+        Array.fold
+            (fun acc x -> acc.Replace(x, String.Empty))
+            text
+            substrings
+module ArgValidation =
+    open Errors
+
+    let validate =
+        if fsi.CommandLineArgs.Length <> 2 // Index 0 is the name of the script itself.
+        then Error InvalidArgCount
+        else
+            let cachedTagFile = FileInfo fsi.CommandLineArgs[1]
+
+            if cachedTagFile.Exists
+            then Ok cachedTagFile
+            else Error (FileMissing cachedTagFile.FullName)
+
 module Settings =
+    open Errors
+
     [<Literal>]
     let private settingsPath = "settings.json"
 
@@ -39,7 +73,12 @@ module Settings =
           ArtistReplacements = settings.ArtistReplacements
           TitleReplacements = settings.TitleReplacements }
 
-    let load () = Settings.Load settingsPath |> toSettings
+    // TODO: Move to the IO module?
+    let load () =
+        try
+            Ok (Settings.Load settingsPath |> toSettings)
+        with
+        | e -> Error (IoError e.Message)
 
     let summarize settings =
         printfn $"Exclusions:          %d{settings.Exclusions.Length}"
@@ -47,7 +86,8 @@ module Settings =
         printfn $"Title Replacements:  %d{settings.TitleReplacements.Length}"
 
 module Tags =
-    // open Utilities
+    open Utilities
+    open Settings // TODO: Refactor to avoid?
 
     [<Literal>]
     let private tagSample = """
@@ -98,12 +138,66 @@ module Tags =
     //       Duration = fileTags.Duration
     //       LastWriteTime = fileTags.LastWriteTime }
 
+    let findDuplicates
+        (artistReplacements: string array)
+        (titleReplacements: string array)
+        (tags: CachedTags.Root array)
+        : (string * CachedTags.Root array) array
+        =
+        tags
+        |> Array.filter (fun track ->
+            let hasArtists = track.Artists.Length > 0
+            let titleText = extractText track.Title
+            let hasTitle = not (String.IsNullOrWhiteSpace titleText)
+            hasArtists && hasTitle)
+        |> Array.groupBy (fun track ->
+            let artists =
+                track.Artists
+                |> Array.map extractText
+                |> String.Concat
+                |> removeSubstrings artistReplacements
+            let title =
+                track.Title
+                |> extractText
+                |> removeSubstrings titleReplacements
+            $"{artists}{title}")
+        |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
+
+    let printResults (groupedTracks: (string * CachedTags.Root array) array) =
+        groupedTracks
+        |> Array.iteri (fun i groupedTracks ->
+            // Print the artist(s) using the group's first file's artists.
+            groupedTracks
+            |> snd
+            |> Array.head
+            |> _.Artists
+            |> joinWithSeparator ", "
+            |> printfn "%d. %s" (i + 1)
+
+            // List each possible-duplicate track in the group.
+            groupedTracks
+            |> snd
+            |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
+
+module IO =
+    open Errors
+    open Tags
+
+    let readAndParseFile (fileInfo: FileInfo) =
+        try
+            System.IO.File.ReadAllText fileInfo.FullName
+            |> CachedTags.Parse
+            |> Ok
+        with
+        | e -> Error (IoError e.Message)
+
+// TODO: Submodule of Tags?
 module Exclusions =
     open Utilities
     open Settings
     open Tags
 
-    let excludeFile (file: CachedTags.Root) (settings: SettingsType) =
+    let private excludeFile (file: CachedTags.Root) (settings: SettingsType) =
         let contains (target: string) (collection: string seq) =
             collection
             |> Seq.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, target))
@@ -119,7 +213,7 @@ module Exclusions =
                  (tags.AlbumArtists |> contains a || tags.Artists |> contains a) &&
                  tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
              | Some a, None ->
-                 (tags.AlbumArtists |> contains a || tags.Artists |> contains a)
+                 tags.AlbumArtists |> contains a || tags.Artists |> contains a
              | None, Some t ->
                  tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
              | _ -> false
@@ -127,66 +221,41 @@ module Exclusions =
         settings.Exclusions
         |> Array.exists isExcluded
 
-module Modifications =
-    let removeSubstrings (substrings: string array) (text: string) : string =
-        Array.fold
-            (fun acc x -> acc.Replace(x, String.Empty))
-            text
-            substrings
+    let runExclusions (settings: SettingsType) (allTags: CachedTags.Root array) =
+        allTags |> Array.filter (fun x -> not <| excludeFile x settings)
 
 open System.IO
 open Settings
 open Tags
 open Utilities
 open Exclusions
-open Modifications
 
-try
-    if fsi.CommandLineArgs.Length <> 2
-    then printfn "Bad arguments!"
-    elif not (File.Exists fsi.CommandLineArgs[1])
-    then printfn "Tag file is missing!"
+let run () =
+    result {
+        let! cachedTagFile = ArgValidation.validate
+        let! settings = Settings.load ()
+        summarize settings
 
-    let cachedTagFileName = fsi.CommandLineArgs[1] // TODO: Add proper validation.
+        let! allTags = IO.readAndParseFile cachedTagFile
+        printfn $"Total file count:    %s{formatWithCommas allTags.Length}"
 
-    let settings = Settings.load ()
-    summarize settings
+        let filteredTags = runExclusions settings allTags
+        printfn $"Filtered file count: %s{formatWithCommas filteredTags.Length}"
 
-    let rawTagJson = System.IO.File.ReadAllText cachedTagFileName
-    let allTags = CachedTags.Parse rawTagJson
-    printfn $"Total file count:    %s{formatWithCommas allTags.Length}"
+        filteredTags
+        |> findDuplicates settings.ArtistReplacements settings.TitleReplacements
+        |> printResults
+    }
 
-    let filteredTags = allTags |> Array.filter (fun x -> not <| excludeFile x settings)
-    printfn $"Filtered file count: %s{formatWithCommas filteredTags.Length}"
+open Errors
 
-    filteredTags
-    |> Array.filter (fun track ->
-        let hasArtists = track.Artists.Length > 0
-        let titleText = extractText track.Title
-        let hasTitle = not (String.IsNullOrWhiteSpace titleText)
-        hasArtists && hasTitle)
-    |> Array.groupBy (fun track ->
-        let artists = track.Artists
-                      |> Array.map extractText
-                      |> String.Concat
-                      |> removeSubstrings settings.ArtistReplacements
-        let title = track.Title
-                    |> extractText
-                    |> removeSubstrings settings.TitleReplacements
-        $"{artists}{title}")
-    |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
-    |> Array.iteri (fun i groupedTracks ->
-        let artists =
-            groupedTracks
-            |> snd
-            |> Array.head
-            |> _.Artists
-            |> joinWithSeparator ", "
-        printfn $"{i + 1}. {artists}"
+let watch = Startwatch.Library.Watch()
 
-        snd groupedTracks
-        |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
-with
-| e ->
-    printfn $"ERROR: {e.Message}"
-    printfn $"ERROR: {e.StackTrace}"
+match run () with
+| Ok _ ->
+    printfn $"Done in {watch.ElapsedFriendly}."
+    0
+| Error e ->
+    printfn "%s" (message e)
+    printfn $"Failed after {watch.ElapsedFriendly}."
+    1
