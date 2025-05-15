@@ -76,8 +76,7 @@ module IO =
 
     let writeFile (fileName: string) (content: string) =
         try
-            File.WriteAllText(fileName, content)
-            |> Ok
+            Ok (File.WriteAllText(fileName, content))
         with
         | e -> Error (IoError e.Message)
 
