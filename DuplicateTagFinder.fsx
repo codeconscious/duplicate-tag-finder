@@ -27,7 +27,7 @@ module Utilities =
         let texts = Array.map extractText xs
         String.Join(separator, texts)
 
-    let formatWithCommas (i: int) =
+    let formatNumber (i: int) =
         i.ToString("N0", CultureInfo.InvariantCulture)
 
     let removeSubstrings (substrings: string array) (text: string) : string =
@@ -38,7 +38,7 @@ module Utilities =
 module ArgValidation =
     open Errors
 
-    let validate =
+    let validateFilePath () =
         if fsi.CommandLineArgs.Length <> 2 // Index 0 is the name of the script itself.
         then Error InvalidArgCount
         else
@@ -80,7 +80,7 @@ module Settings =
         with
         | e -> Error (IoError e.Message)
 
-    let summarize settings =
+    let summarize (settings: SettingsType) =
         printfn $"Exclusions:          %d{settings.Exclusions.Length}"
         printfn $"Artist Replacements: %d{settings.ArtistReplacements.Length}"
         printfn $"Title Replacements:  %d{settings.TitleReplacements.Length}"
@@ -139,8 +139,7 @@ module Tags =
     //       LastWriteTime = fileTags.LastWriteTime }
 
     let findDuplicates
-        (artistReplacements: string array)
-        (titleReplacements: string array)
+        (settings: SettingsType)
         (tags: CachedTags.Root array)
         : (string * CachedTags.Root array) array
         =
@@ -155,11 +154,11 @@ module Tags =
                 track.Artists
                 |> Array.map extractText
                 |> String.Concat
-                |> removeSubstrings artistReplacements
+                |> removeSubstrings settings.ArtistReplacements
             let title =
                 track.Title
                 |> extractText
-                |> removeSubstrings titleReplacements
+                |> removeSubstrings settings.TitleReplacements
             $"{artists}{title}")
         |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
 
@@ -183,7 +182,7 @@ module IO =
     open Errors
     open Tags
 
-    let readAndParseFile (fileInfo: FileInfo) =
+    let readAndParseFile (fileInfo: FileInfo) : Result<CachedTags.Root array, Errors> =
         try
             System.IO.File.ReadAllText fileInfo.FullName
             |> CachedTags.Parse
@@ -221,10 +220,11 @@ module Exclusions =
         settings.Exclusions
         |> Array.exists isExcluded
 
-    let runExclusions (settings: SettingsType) (allTags: CachedTags.Root array) =
-        allTags |> Array.filter (fun x -> not <| excludeFile x settings)
+    let filterTags (settings: SettingsType) (allTags: CachedTags.Root array) =
+        allTags
+        |> Array.filter (fun x -> not <| excludeFile x settings)
 
-open System.IO
+open Errors
 open Settings
 open Tags
 open Utilities
@@ -232,22 +232,19 @@ open Exclusions
 
 let run () =
     result {
-        let! cachedTagFile = ArgValidation.validate
-        let! settings = Settings.load ()
-        summarize settings
+        let! settings =
+            Settings.load ()
+            |> Result.tee summarize
 
-        let! allTags = IO.readAndParseFile cachedTagFile
-        printfn $"Total file count:    %s{formatWithCommas allTags.Length}"
-
-        let filteredTags = runExclusions settings allTags
-        printfn $"Filtered file count: %s{formatWithCommas filteredTags.Length}"
-
-        filteredTags
-        |> findDuplicates settings.ArtistReplacements settings.TitleReplacements
-        |> printResults
+        return
+            ArgValidation.validateFilePath ()
+            |> Result.bind IO.readAndParseFile
+            |> Result.tee (fun tags -> printfn $"Total file count:    %s{formatNumber tags.Length}")
+            |> Result.map (fun tags -> filterTags settings tags)
+            |> Result.tee (fun filteredTags -> printfn $"Filtered file count: %s{formatNumber filteredTags.Length}")
+            |> Result.map (fun filteredTags -> findDuplicates settings filteredTags)
+            |> Result.tee printResults
     }
-
-open Errors
 
 let watch = Startwatch.Library.Watch()
 
