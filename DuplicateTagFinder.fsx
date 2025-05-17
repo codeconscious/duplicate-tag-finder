@@ -121,35 +121,6 @@ module Tags =
     let printFilteredTagCount (tags: FilteredTagCollection) =
         printfn $"Filtered file count: %s{formatNumber tags.Length}"
 
-    // type TaggedFileInfo =
-    //     { FileName: string
-    //       DirectoryName: string
-    //       Artists: string array
-    //       AlbumArtists: string array
-    //       Album: string
-    //       TrackNo: int
-    //       Title: string
-    //       Year: int
-    //       Genres: string array
-    //       Duration: TimeSpan
-    //       LastWriteTime: DateTimeOffset }
-
-    // let private toTaggedFileInfo (fileTags: CachedTags.Root) =
-    //     let toFsharpArray coll =
-    //         coll |> Seq.cast |> Seq.toArray
-    //
-    //     { FileName = fileTags.FileName |> extractText
-    //       DirectoryName = fileTags.DirectoryName |> extractText
-    //       Artists = fileTags.Artists |> toFsharpArray
-    //       AlbumArtists = fileTags.AlbumArtists |> toFsharpArray
-    //       Album = fileTags.Album |> extractText
-    //       TrackNo = fileTags.TrackNo
-    //       Title = fileTags.Title |> extractText
-    //       Year = fileTags.Year
-    //       Genres = fileTags.Genres |> toFsharpArray
-    //       Duration = fileTags.Duration
-    //       LastWriteTime = fileTags.LastWriteTime }
-
     module Filtering =
         let private excludeFile (settings: SettingsType) (file: FileTags) =
             let contains (target: string) (collection: string seq) =
