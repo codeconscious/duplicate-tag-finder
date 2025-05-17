@@ -247,6 +247,12 @@ open Tags
 open Exclusions
 open Operators
 
+let printTagCount (isFiltered: bool) (tags: CachedTags.Root array) =
+    match isFiltered with
+    | false -> $"Total file count:    %s{formatNumber tags.Length}"
+    | true -> $"Filtered file count: %s{formatNumber tags.Length}"
+    |> printfn "%s"
+
 let run () =
     result {
         let! settings =
@@ -257,10 +263,10 @@ let run () =
             ArgValidation.validateFilePath ()
             >>= IO.readFile
             >>= IO.parseJson
-            <.> (fun tags -> printfn $"Total file count:    %s{formatNumber tags.Length}")
-            <!> (fun tags -> filterTags settings tags)
-            <.> (fun filteredTags -> printfn $"Filtered file count: %s{formatNumber filteredTags.Length}")
-            <!> (fun filteredTags -> findDuplicates settings filteredTags)
+            <.> printTagCount false
+            <!> filterTags settings
+            <.> printTagCount true
+            <!> findDuplicates settings
             <.> printResults
     }
 
