@@ -235,26 +235,33 @@ module Exclusions =
         allTags
         |> Array.filter (fun x -> not <| excludeFile settings x)
 
+module Operators =
+    let (>>=) result func = Result.bind func result
+    let (<!>) result func = Result.map func result
+    let (<.>) result func = Result.tee func result
+
 open Errors
+open Utilities
 open Settings
 open Tags
-open Utilities
 open Exclusions
+open Operators
 
 let run () =
     result {
         let! settings =
             Settings.load ()
-            |> Result.tee summarize
+            <.> summarize
 
         return
             ArgValidation.validateFilePath ()
-            |> Result.bind IO.readAndParseFile
-            |> Result.tee (fun tags -> printfn $"Total file count:    %s{formatNumber tags.Length}")
-            |> Result.map (fun tags -> filterTags settings tags)
-            |> Result.tee (fun filteredTags -> printfn $"Filtered file count: %s{formatNumber filteredTags.Length}")
-            |> Result.map (fun filteredTags -> findDuplicates settings filteredTags)
-            |> Result.tee printResults
+            >>= IO.readFile
+            >>= IO.parseJson
+            <.> (fun tags -> printfn $"Total file count:    %s{formatNumber tags.Length}")
+            <!> (fun tags -> filterTags settings tags)
+            <.> (fun filteredTags -> printfn $"Filtered file count: %s{formatNumber filteredTags.Length}")
+            <!> (fun filteredTags -> findDuplicates settings filteredTags)
+            <.> printResults
     }
 
 let watch = Startwatch.Library.Watch()
