@@ -110,7 +110,16 @@ module Tags =
       }
     ]"""
 
-    type CachedTags = JsonProvider<tagSample>
+    type TagJsonProvider = JsonProvider<tagSample>
+    type FileTags = TagJsonProvider.Root
+    type TagCollection = FileTags array
+    type FilteredTagCollection = FileTags array
+
+    let printTotalTagCount (tags: TagCollection) =
+        printfn $"Total file count:    %s{formatNumber tags.Length}"
+
+    let printFilteredTagCount (tags: FilteredTagCollection) =
+        printfn $"Filtered file count: %s{formatNumber tags.Length}"
 
     // type TaggedFileInfo =
     //     { FileName: string
@@ -141,10 +150,41 @@ module Tags =
     //       Duration = fileTags.Duration
     //       LastWriteTime = fileTags.LastWriteTime }
 
+    module Filtering =
+        let private excludeFile (settings: SettingsType) (file: FileTags) =
+            let contains (target: string) (collection: string seq) =
+                collection
+                |> Seq.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, target))
+
+            let tags =
+                {|
+                    AlbumArtists = Seq.map extractText file.AlbumArtists
+                    Artists = Seq.map extractText file.Artists
+                    Title = extractText file.Title
+                |}
+
+            let isExcluded rule =
+                match rule.Artist, rule.Title with
+                | Some a, Some t ->
+                    (tags.AlbumArtists |> contains a || tags.Artists |> contains a) &&
+                    tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+                | Some a, None ->
+                    tags.AlbumArtists |> contains a || tags.Artists |> contains a
+                | None, Some t ->
+                    tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+                | _ -> false
+
+            settings.Exclusions
+            |> Array.exists isExcluded
+
+        let filterTags (settings: SettingsType) (allTags: TagCollection) =
+            allTags
+            |> Array.filter (fun x -> not <| excludeFile settings x)
+
     let findDuplicates
         (settings: SettingsType)
-        (tags: CachedTags.Root array)
-        : (string * CachedTags.Root array) array
+        (tags: FilteredTagCollection)
+        : (string * FilteredTagCollection) array
         =
         tags
         |> Array.filter (fun track ->
@@ -165,7 +205,7 @@ module Tags =
             $"{artists}{title}")
         |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
 
-    let printResults (groupedTracks: (string * CachedTags.Root array) array) =
+    let printResults (groupedTracks: (string * FilteredTagCollection) array) =
         groupedTracks
         |> Array.iteri (fun i groupedTracks ->
             // Print the artist(s) using the group's first file's artists.
@@ -193,47 +233,13 @@ module IO =
         with
         | e -> Error (IoError e.Message)
 
-    let parseJson (json: string) : Result<CachedTags.Root array, Error> =
+    let parseJsonToTags (json: string) : Result<TagCollection, Error> =
         try
             json
-            |> CachedTags.Parse
+            |> TagJsonProvider.Parse
             |> Ok
         with
         | e -> Error (ParseError e.Message)
-
-// TODO: Submodule of Tags?
-module Exclusions =
-    open Utilities
-    open Settings
-    open Tags
-
-    let private excludeFile (settings: SettingsType) (file: CachedTags.Root) =
-        let contains (target: string) (collection: string seq) =
-            collection
-            |> Seq.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, target))
-
-        let tags =
-            {| AlbumArtists = Seq.map extractText file.AlbumArtists
-               Artists = Seq.map extractText file.Artists
-               Title = extractText file.Title |}
-
-        let isExcluded rule =
-             match rule.Artist, rule.Title with
-             | Some a, Some t ->
-                 (tags.AlbumArtists |> contains a || tags.Artists |> contains a) &&
-                 tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
-             | Some a, None ->
-                 tags.AlbumArtists |> contains a || tags.Artists |> contains a
-             | None, Some t ->
-                 tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
-             | _ -> false
-
-        settings.Exclusions
-        |> Array.exists isExcluded
-
-    let filterTags (settings: SettingsType) (allTags: CachedTags.Root array) =
-        allTags
-        |> Array.filter (fun x -> not <| excludeFile settings x)
 
 module Operators =
     let (>>=) result func = Result.bind func result
@@ -241,17 +247,10 @@ module Operators =
     let (<.>) result func = Result.tee func result
 
 open Errors
-open Utilities
 open Settings
 open Tags
-open Exclusions
+open Filtering
 open Operators
-
-let printTagCount (isFiltered: bool) (tags: CachedTags.Root array) =
-    match isFiltered with
-    | false -> $"Total file count:    %s{formatNumber tags.Length}"
-    | true -> $"Filtered file count: %s{formatNumber tags.Length}"
-    |> printfn "%s"
 
 let run () =
     result {
@@ -262,10 +261,10 @@ let run () =
         return
             ArgValidation.validateFilePath ()
             >>= IO.readFile
-            >>= IO.parseJson
-            <.> printTagCount false
+            >>= IO.parseJsonToTags
+            <.> printTotalTagCount
             <!> filterTags settings
-            <.> printTagCount true
+            <.> printFilteredTagCount
             <!> findDuplicates settings
             <.> printResults
     }
