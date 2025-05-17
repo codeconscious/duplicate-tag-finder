@@ -9,15 +9,17 @@ open FSharp.Data
 open FsToolkit.ErrorHandling
 
 module Errors =
-    type Errors =
+    type Error =
         | InvalidArgCount
         | FileMissing of string
         | IoError of string
+        | ParseError of string
 
     let message = function
         | InvalidArgCount -> "Invalid arguments. Pass in the path to the JSON file containing your cached tag data."
-        | FileMissing e -> $"The file \"{e}\" was not found."
-        | IoError e -> $"I/O failure: {e}"
+        | FileMissing fileName -> $"The file \"{fileName}\" was not found."
+        | IoError msg -> $"I/O failure: {msg}"
+        | ParseError msg -> $"Could not parse the content: {msg}"
 
 module Utilities =
     let extractText (x: Runtime.BaseTypes.IJsonDocument) =
@@ -35,6 +37,7 @@ module Utilities =
             (fun acc x -> acc.Replace(x, String.Empty))
             text
             substrings
+
 module ArgValidation =
     open Errors
 
@@ -182,13 +185,21 @@ module IO =
     open Errors
     open Tags
 
-    let readAndParseFile (fileInfo: FileInfo) : Result<CachedTags.Root array, Errors> =
+    let readFile (fileInfo: FileInfo) : Result<string, Error> =
         try
-            System.IO.File.ReadAllText fileInfo.FullName
-            |> CachedTags.Parse
+            fileInfo.FullName
+            |> System.IO.File.ReadAllText
             |> Ok
         with
         | e -> Error (IoError e.Message)
+
+    let parseJson (json: string) : Result<CachedTags.Root array, Error> =
+        try
+            json
+            |> CachedTags.Parse
+            |> Ok
+        with
+        | e -> Error (ParseError e.Message)
 
 // TODO: Submodule of Tags?
 module Exclusions =
@@ -196,7 +207,7 @@ module Exclusions =
     open Settings
     open Tags
 
-    let private excludeFile (file: CachedTags.Root) (settings: SettingsType) =
+    let private excludeFile (settings: SettingsType) (file: CachedTags.Root) =
         let contains (target: string) (collection: string seq) =
             collection
             |> Seq.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, target))
@@ -222,7 +233,7 @@ module Exclusions =
 
     let filterTags (settings: SettingsType) (allTags: CachedTags.Root array) =
         allTags
-        |> Array.filter (fun x -> not <| excludeFile x settings)
+        |> Array.filter (fun x -> not <| excludeFile settings x)
 
 open Errors
 open Settings
