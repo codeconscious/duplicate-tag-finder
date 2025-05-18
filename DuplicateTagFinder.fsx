@@ -95,6 +95,7 @@ module Settings =
 
     type SettingsProvider = JsonProvider<settingsSample>
     type SettingsRoot = SettingsProvider.Root
+    type Exclusion = SettingsProvider.Exclusion
 
     type ExclusionPair =
         { Artist: string option
@@ -106,15 +107,16 @@ module Settings =
           TitleReplacements: string array }
 
     let toSettings (settings: SettingsRoot) : SettingsType =
-        { Exclusions =
-              settings.Exclusions
-              |> Array.map (fun e ->
-                {
-                    Artist = Some (extractText e.Artist)
-                    Title = Some (extractText e.Title)
-                })
-          ArtistReplacements = settings.ArtistReplacements |> Array.map extractText
-          TitleReplacements = settings.TitleReplacements |> Array.map extractText
+        let toExclusionPair (e: Exclusion) =
+            {
+                Artist = Some (extractText e.Artist)
+                Title = Some (extractText e.Title)
+            }
+
+        {
+            Exclusions = settings.Exclusions |> Array.map toExclusionPair
+            ArtistReplacements = settings.ArtistReplacements |> Array.map extractText
+            TitleReplacements = settings.TitleReplacements |> Array.map extractText
         }
 
     let load (json: string) : Result<SettingsType, Error> =
