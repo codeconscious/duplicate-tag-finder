@@ -119,7 +119,7 @@ module Settings =
             TitleReplacements = settings.TitleReplacements |> Array.map extractText
         }
 
-    let load (json: string) : Result<SettingsType, Error> =
+    let parseJsonToSettings (json: string) : Result<SettingsType, Error> =
         try
             json
             |> SettingsProvider.Parse
@@ -259,7 +259,7 @@ let run () =
         let! settings =
             settingsFile
             |> readFile
-            >>= Settings.load
+            >>= parseJsonToSettings
             <.> printSummary
 
         return
