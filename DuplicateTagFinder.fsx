@@ -41,18 +41,40 @@ module Utilities =
 module ArgValidation =
     open Errors
 
-    let validateArgCount (args: string array) : Result<string, Error> =
-        if args.Length <> 2 // Index 0 is the name of the script itself.
+    let validateArgCount (args: string array) : Result<string * string, Error> =
+        if args.Length <> 3 // Index 0 is the name of the script itself.
         then Error InvalidArgCount
-        else Ok args[1]
+        else Ok (args[1], args[2])
 
 module Settings =
     open Errors
+    open Utilities
 
     [<Literal>]
-    let settingsPath = "settings.json"
+    let settingsSample = """
+    {
+        "exclusions": [
+            {
+                "artist": ""
+            },
+            {
+                "title": ""
+            },
+            {
+                "artist": "",
+                "title": ""
+            }
+        ],
+        "artistReplacements": [
+            ""
+        ],
+        "titleReplacements": [
+            ""
+        ]
+    }
+    """
 
-    type SettingsProvider = JsonProvider<settingsPath>
+    type SettingsProvider = JsonProvider<settingsSample>
     type SettingsRoot = SettingsProvider.Root
 
     type ExclusionPair =
@@ -67,13 +89,21 @@ module Settings =
     let toSettings (settings: SettingsRoot) : SettingsType =
         { Exclusions =
               settings.Exclusions
-              |> Array.map (fun e -> { Artist = e.Artist; Title = e.Title })
-          ArtistReplacements = settings.ArtistReplacements
-          TitleReplacements = settings.TitleReplacements }
+              |> Array.map (fun e ->
+                {
+                    Artist = Some (extractText e.Artist)
+                    Title = Some (extractText e.Title)
+                })
+          ArtistReplacements = settings.ArtistReplacements |> Array.map extractText
+          TitleReplacements = settings.TitleReplacements |> Array.map extractText
+        }
 
-    let load () : Result<SettingsType,Error> =
+    let load (json: string) : Result<SettingsType,Error> =
         try
-            Ok (SettingsProvider.Load settingsPath |> toSettings)
+            json
+            |> SettingsProvider.Load
+            |> toSettings
+            |> Ok
         with
         | e -> Error (IoError e.Message)
 
@@ -195,15 +225,15 @@ module Tags =
     let printResults (groupedTracks: (string * FilteredTagCollection) array) =
         groupedTracks
         |> Array.iteri (fun i groupedTracks ->
-            // Print the artist(s) using the group's first file's artists.
+            // Print the artist(s) using the group's first file's artist(s).
             groupedTracks
             |> snd
             |> Array.head
             |> _.Artists
             |> joinWithSeparator ", "
-            |> printfn "%d. %s" (i + 1)
+            |> printfn "%d. %s" (i + 1) // Start at 1.
 
-            // List each possible-duplicate track in the group.
+            // Print each possible-duplicate track in the group.
             groupedTracks
             |> snd
             |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
@@ -221,12 +251,13 @@ open Operators
 
 let run () =
     result {
-        let! settings = Settings.load () <.> printSummary
+        let! settingsFile, cachedTagFile = validateArgCount fsi.CommandLineArgs
+
+        let! settings = Settings.load settingsFile <.> printSummary
 
         return
-            fsi.CommandLineArgs
-            |> validateArgCount
-            >>= confirmFileExists
+            cachedTagFile
+            |> confirmFileExists
             >>= readFile
             >>= parseJsonToTags
             <.> printTotalCount
