@@ -16,10 +16,16 @@ module Errors =
         | ParseError of string
 
     let message: Error -> string = function
-        | InvalidArgCount -> "Invalid arguments. Pass in the path to the JSON file containing your cached tag data."
+        | InvalidArgCount -> "Invalid arguments. Pass in two JSON filename paths: (1) your settings file and (2) your cached tag data."
         | FileMissing fileName -> $"The file \"{fileName}\" was not found."
         | IoError msg -> $"I/O failure: {msg}"
-        | ParseError msg -> $"Could not parse the content: {msg}"
+        | ParseError msg -> $"Could not parse the file: {msg}"
+
+module Operators =
+    let (>>=) result func = Result.bind func result
+    let (<!>) result func = Result.map func result
+    let (<.>) result func = Result.tee func result
+
 
 module Utilities =
     let extractText (x: Runtime.BaseTypes.IJsonDocument) : string =
@@ -38,10 +44,33 @@ module Utilities =
             text
             substrings
 
+module IO =
+    open Errors
+    open Operators
+
+    let private confirmFileExists (fileName: string) : Result<FileInfo, Error> =
+        let fileInfo = FileInfo fileName
+        if fileInfo.Exists
+        then Ok fileInfo
+        else Error (FileMissing fileInfo.FullName)
+
+    let private readFile (fileInfo: FileInfo) : Result<string, Error> =
+        try
+            fileInfo.FullName
+            |> System.IO.File.ReadAllText
+            |> Ok
+        with
+        | e -> Error (IoError e.Message)
+
+    let confirmAndRead fileName =
+        fileName
+        |> confirmFileExists
+        >>= readFile
+
 module ArgValidation =
     open Errors
 
-    let validateArgCount (args: string array) : Result<string * string, Error> =
+    let validate (args: string array) : Result<string * string, Error> =
         if args.Length <> 3 // Index 0 is the name of the script itself.
         then Error InvalidArgCount
         else Ok (args[1], args[2])
@@ -101,7 +130,7 @@ module Settings =
     let load (json: string) : Result<SettingsType, Error> =
         try
             json
-            |> SettingsProvider.Load
+            |> SettingsProvider.Parse
             |> toSettings
             |> Ok
         with
@@ -140,20 +169,6 @@ module Tags =
     type TagCollection = FileTags array
     type FilteredTagCollection = FileTags array
 
-    let confirmFileExists (fileName: string) : Result<FileInfo,Error> =
-        let fileInfo = FileInfo fileName
-        if fileInfo.Exists
-        then Ok fileInfo
-        else Error (FileMissing fileInfo.FullName)
-
-    let readFile (fileInfo: FileInfo) : Result<string, Error> =
-        try
-            fileInfo.FullName
-            |> System.IO.File.ReadAllText
-            |> Ok
-        with
-        | e -> Error (IoError e.Message)
-
     let parseJsonToTags (json: string) : Result<TagCollection, Error> =
         try
             json
@@ -178,12 +193,10 @@ module Tags =
             let isExcluded rule =
                 match rule.Artist, rule.Title with
                 | Some excludedArtist, Some excludedTitle ->
-                    (contains excludedArtist tags.AlbumArtists ||
-                    contains excludedArtist tags.Artists) &&
+                    (contains excludedArtist tags.AlbumArtists || contains excludedArtist tags.Artists) &&
                     tags.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
                 | Some excludedArtist, None ->
-                    contains excludedArtist tags.AlbumArtists ||
-                    contains excludedArtist tags.Artists
+                    contains excludedArtist tags.AlbumArtists || contains excludedArtist tags.Artists
                 | None, Some excludedTitle ->
                     tags.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
                 | _ -> false
@@ -240,27 +253,26 @@ module Tags =
             |> snd
             |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
 
-module Operators =
-    let (>>=) result func = Result.bind func result
-    let (<!>) result func = Result.map func result
-    let (<.>) result func = Result.tee func result
-
 open ArgValidation
 open Errors
+open IO
 open Tags
 open Settings
 open Operators
 
 let run () =
     result {
-        let! settingsFile, cachedTagFile = validateArgCount fsi.CommandLineArgs
+        let! settingsFile, cachedTagFile = validate fsi.CommandLineArgs
 
-        let! settings = Settings.load settingsFile <.> printSummary
+        let! settings =
+            settingsFile
+            |> confirmAndRead
+            >>= Settings.load
+            <.> printSummary
 
         return
             cachedTagFile
-            |> confirmFileExists
-            >>= readFile
+            |> confirmAndRead
             >>= parseJsonToTags
             <.> printTotalCount
             <!> filter settings
