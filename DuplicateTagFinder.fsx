@@ -16,10 +16,16 @@ module Errors =
         | ParseError of string
 
     let message: Error -> string = function
-        | InvalidArgCount -> "Invalid arguments. Pass in the path to the JSON file containing your cached tag data."
+        | InvalidArgCount -> "Invalid arguments. Pass in two JSON filename paths: (1) your settings file and (2) your cached tag data."
         | FileMissing fileName -> $"The file \"{fileName}\" was not found."
         | IoError msg -> $"I/O failure: {msg}"
-        | ParseError msg -> $"Could not parse the content: {msg}"
+        | ParseError msg -> $"Could not parse the file: {msg}"
+
+module Operators =
+    let (>>=) result func = Result.bind func result
+    let (<!>) result func = Result.map func result
+    let (<.>) result func = Result.tee func result
+
 
 module Utilities =
     let extractText (x: Runtime.BaseTypes.IJsonDocument) : string =
@@ -38,22 +44,58 @@ module Utilities =
             text
             substrings
 
+module IO =
+    open Errors
+    open Operators
+
+    let readFile (fileName: string) : Result<string, Error> =
+        try
+            fileName
+            |> System.IO.File.ReadAllText
+            |> Ok
+        with
+        | :? FileNotFoundException -> Error (FileMissing fileName)
+        | e -> Error (IoError e.Message)
+
 module ArgValidation =
     open Errors
 
-    let validateArgCount (args: string array) : Result<string, Error> =
-        if args.Length <> 2 // Index 0 is the name of the script itself.
+    let validate (args: string array) : Result<string * string, Error> =
+        if args.Length <> 3 // Index 0 is the name of the script itself.
         then Error InvalidArgCount
-        else Ok args[1]
+        else Ok (args[1], args[2])
 
 module Settings =
     open Errors
+    open Utilities
 
     [<Literal>]
-    let settingsPath = "settings.json"
+    let settingsSample = """
+    {
+        "exclusions": [
+            {
+                "artist": ""
+            },
+            {
+                "title": ""
+            },
+            {
+                "artist": "",
+                "title": ""
+            }
+        ],
+        "artistReplacements": [
+            ""
+        ],
+        "titleReplacements": [
+            ""
+        ]
+    }
+    """
 
-    type SettingsProvider = JsonProvider<settingsPath>
+    type SettingsProvider = JsonProvider<settingsSample>
     type SettingsRoot = SettingsProvider.Root
+    type Exclusion = SettingsProvider.Exclusion
 
     type ExclusionPair =
         { Artist: string option
@@ -65,15 +107,24 @@ module Settings =
           TitleReplacements: string array }
 
     let toSettings (settings: SettingsRoot) : SettingsType =
-        { Exclusions =
-              settings.Exclusions
-              |> Array.map (fun e -> { Artist = e.Artist; Title = e.Title })
-          ArtistReplacements = settings.ArtistReplacements
-          TitleReplacements = settings.TitleReplacements }
+        let toExclusionPair (e: Exclusion) =
+            {
+                Artist = Some (extractText e.Artist)
+                Title = Some (extractText e.Title)
+            }
 
-    let load () : Result<SettingsType,Error> =
+        {
+            Exclusions = settings.Exclusions |> Array.map toExclusionPair
+            ArtistReplacements = settings.ArtistReplacements |> Array.map extractText
+            TitleReplacements = settings.TitleReplacements |> Array.map extractText
+        }
+
+    let load (json: string) : Result<SettingsType, Error> =
         try
-            Ok (SettingsProvider.Load settingsPath |> toSettings)
+            json
+            |> SettingsProvider.Parse
+            |> toSettings
+            |> Ok
         with
         | e -> Error (IoError e.Message)
 
@@ -110,20 +161,6 @@ module Tags =
     type TagCollection = FileTags array
     type FilteredTagCollection = FileTags array
 
-    let confirmFileExists (fileName: string) : Result<FileInfo,Error> =
-        let fileInfo = FileInfo fileName
-        if fileInfo.Exists
-        then Ok fileInfo
-        else Error (FileMissing fileInfo.FullName)
-
-    let readFile (fileInfo: FileInfo) : Result<string, Error> =
-        try
-            fileInfo.FullName
-            |> System.IO.File.ReadAllText
-            |> Ok
-        with
-        | e -> Error (IoError e.Message)
-
     let parseJsonToTags (json: string) : Result<TagCollection, Error> =
         try
             json
@@ -147,13 +184,13 @@ module Tags =
 
             let isExcluded rule =
                 match rule.Artist, rule.Title with
-                | Some a, Some t ->
-                    (tags.AlbumArtists |> contains a || tags.Artists |> contains a) &&
-                    tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
-                | Some a, None ->
-                    tags.AlbumArtists |> contains a || tags.Artists |> contains a
-                | None, Some t ->
-                    tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+                | Some excludedArtist, Some excludedTitle ->
+                    (contains excludedArtist tags.AlbumArtists || contains excludedArtist tags.Artists) &&
+                    tags.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
+                | Some excludedArtist, None ->
+                    contains excludedArtist tags.AlbumArtists || contains excludedArtist tags.Artists
+                | None, Some excludedTitle ->
+                    tags.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
                 | _ -> false
 
             settings.Exclusions
@@ -195,39 +232,39 @@ module Tags =
     let printResults (groupedTracks: (string * FilteredTagCollection) array) =
         groupedTracks
         |> Array.iteri (fun i groupedTracks ->
-            // Print the artist(s) using the group's first file's artists.
+            // Print the artist(s) using the group's first file's artist(s).
             groupedTracks
             |> snd
             |> Array.head
             |> _.Artists
             |> joinWithSeparator ", "
-            |> printfn "%d. %s" (i + 1)
+            |> printfn "%d. %s" (i + 1) // Start at 1.
 
-            // List each possible-duplicate track in the group.
+            // Print each possible-duplicate track in the group.
             groupedTracks
             |> snd
             |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
 
-module Operators =
-    let (>>=) result func = Result.bind func result
-    let (<!>) result func = Result.map func result
-    let (<.>) result func = Result.tee func result
-
 open ArgValidation
 open Errors
+open IO
 open Tags
 open Settings
 open Operators
 
 let run () =
     result {
-        let! settings = Settings.load () <.> printSummary
+        let! settingsFile, cachedTagFile = validate fsi.CommandLineArgs
+
+        let! settings =
+            settingsFile
+            |> readFile
+            >>= Settings.load
+            <.> printSummary
 
         return
-            fsi.CommandLineArgs
-            |> validateArgCount
-            >>= confirmFileExists
-            >>= readFile
+            cachedTagFile
+            |> readFile
             >>= parseJsonToTags
             <.> printTotalCount
             <!> filter settings
