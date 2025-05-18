@@ -48,24 +48,14 @@ module IO =
     open Errors
     open Operators
 
-    let private confirmFileExists (fileName: string) : Result<FileInfo, Error> =
-        let fileInfo = FileInfo fileName
-        if fileInfo.Exists
-        then Ok fileInfo
-        else Error (FileMissing fileInfo.FullName)
-
-    let private readFile (fileInfo: FileInfo) : Result<string, Error> =
+    let readFile (fileName: string) : Result<string, Error> =
         try
-            fileInfo.FullName
+            fileName
             |> System.IO.File.ReadAllText
             |> Ok
         with
+        | :? FileNotFoundException -> Error (FileMissing fileName)
         | e -> Error (IoError e.Message)
-
-    let confirmAndRead fileName =
-        fileName
-        |> confirmFileExists
-        >>= readFile
 
 module ArgValidation =
     open Errors
@@ -266,13 +256,13 @@ let run () =
 
         let! settings =
             settingsFile
-            |> confirmAndRead
+            |> readFile
             >>= Settings.load
             <.> printSummary
 
         return
             cachedTagFile
-            |> confirmAndRead
+            |> readFile
             >>= parseJsonToTags
             <.> printTotalCount
             <!> filter settings
