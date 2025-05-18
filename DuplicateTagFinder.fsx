@@ -98,7 +98,7 @@ module Settings =
           TitleReplacements = settings.TitleReplacements |> Array.map extractText
         }
 
-    let load (json: string) : Result<SettingsType,Error> =
+    let load (json: string) : Result<SettingsType, Error> =
         try
             json
             |> SettingsProvider.Load
@@ -177,13 +177,15 @@ module Tags =
 
             let isExcluded rule =
                 match rule.Artist, rule.Title with
-                | Some a, Some t ->
-                    (tags.AlbumArtists |> contains a || tags.Artists |> contains a) &&
-                    tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
-                | Some a, None ->
-                    tags.AlbumArtists |> contains a || tags.Artists |> contains a
-                | None, Some t ->
-                    tags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+                | Some excludedArtist, Some excludedTitle ->
+                    (contains excludedArtist tags.AlbumArtists ||
+                    contains excludedArtist tags.Artists) &&
+                    tags.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
+                | Some excludedArtist, None ->
+                    contains excludedArtist tags.AlbumArtists ||
+                    contains excludedArtist tags.Artists
+                | None, Some excludedTitle ->
+                    tags.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
                 | _ -> false
 
             settings.Exclusions
