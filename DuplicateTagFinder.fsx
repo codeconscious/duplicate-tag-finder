@@ -129,9 +129,10 @@ module Settings =
         | e -> Error (IoError e.Message)
 
     let printSummary (settings: SettingsType) =
-        printfn $"Exclusions:          %d{settings.Exclusions.Length}"
-        printfn $"Artist Replacements: %d{settings.ArtistReplacements.Length}"
-        printfn $"Title Replacements:  %d{settings.TitleReplacements.Length}"
+        printfn "Settings summary:"
+        printfn $"  Exclusions:          %d{settings.Exclusions.Length}"
+        printfn $"  Artist Replacements: %d{settings.ArtistReplacements.Length}"
+        printfn $"  Title Replacements:  %d{settings.TitleReplacements.Length}"
 
 module Tags =
     open Errors
@@ -230,20 +231,23 @@ module Tags =
         printfn $"Filtered file count: %s{formatNumber tags.Length}"
 
     let printResults (groupedTracks: (string * FilteredTagCollection) array) =
-        groupedTracks
-        |> Array.iteri (fun i groupedTracks ->
-            // Print the artist(s) using the group's first file's artist(s).
+        if groupedTracks.Length = 0
+        then printfn "No duplicates found."
+        else
             groupedTracks
-            |> snd
-            |> Array.head
-            |> _.Artists
-            |> joinWithSeparator ", "
-            |> printfn "%d. %s" (i + 1) // Start at 1.
+            |> Array.iteri (fun i groupTracks ->
+                // Print the artist(s) using the group's first file's artist(s).
+                groupTracks
+                |> snd
+                |> Array.head
+                |> _.Artists
+                |> joinWithSeparator ", "
+                |> printfn "%d. %s" (i + 1) // Start at 1.
 
-            // Print each possible-duplicate track in the group.
-            groupedTracks
-            |> snd
-            |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
+                // Print each possible-duplicate track in the group.
+                groupTracks
+                |> snd
+                |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
 
 open ArgValidation
 open Errors
