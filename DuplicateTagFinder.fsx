@@ -15,14 +15,14 @@ module Errors =
         | IoError of string
         | ParseError of string
 
-    let message = function
+    let message: Error -> string = function
         | InvalidArgCount -> "Invalid arguments. Pass in the path to the JSON file containing your cached tag data."
         | FileMissing fileName -> $"The file \"{fileName}\" was not found."
         | IoError msg -> $"I/O failure: {msg}"
         | ParseError msg -> $"Could not parse the content: {msg}"
 
 module Utilities =
-    let extractText (x: Runtime.BaseTypes.IJsonDocument) =
+    let extractText (x: Runtime.BaseTypes.IJsonDocument) : string =
         x.JsonValue.InnerText()
 
     let joinWithSeparator (separator: string) (xs: Runtime.BaseTypes.IJsonDocument array) =
@@ -41,23 +41,19 @@ module Utilities =
 module ArgValidation =
     open Errors
 
-    let validateFilePath () =
-        if fsi.CommandLineArgs.Length <> 2 // Index 0 is the name of the script itself.
+    let validateArgCount (args: string array) : Result<string, Error> =
+        if args.Length <> 2 // Index 0 is the name of the script itself.
         then Error InvalidArgCount
-        else
-            let cachedTagFile = FileInfo fsi.CommandLineArgs[1]
-
-            if cachedTagFile.Exists
-            then Ok cachedTagFile
-            else Error (FileMissing cachedTagFile.FullName)
+        else Ok args[1]
 
 module Settings =
     open Errors
 
     [<Literal>]
-    let private settingsPath = "settings.json"
+    let settingsPath = "settings.json"
 
-    type private Settings = JsonProvider<settingsPath>
+    type SettingsProvider = JsonProvider<settingsPath>
+    type SettingsRoot = SettingsProvider.Root
 
     type ExclusionPair =
         { Artist: string option
@@ -68,29 +64,28 @@ module Settings =
           ArtistReplacements: string array
           TitleReplacements: string array }
 
-    let private toSettings (settings: Settings.Root) =
+    let toSettings (settings: SettingsRoot) : SettingsType =
         { Exclusions =
               settings.Exclusions
-              |> Array.map (fun x -> { Artist = x.Artist
-                                       Title = x.Title })
+              |> Array.map (fun e -> { Artist = e.Artist; Title = e.Title })
           ArtistReplacements = settings.ArtistReplacements
           TitleReplacements = settings.TitleReplacements }
 
-    // TODO: Move to the IO module?
-    let load () =
+    let load () : Result<SettingsType,Error> =
         try
-            Ok (Settings.Load settingsPath |> toSettings)
+            Ok (SettingsProvider.Load settingsPath |> toSettings)
         with
         | e -> Error (IoError e.Message)
 
-    let summarize (settings: SettingsType) =
+    let printSummary (settings: SettingsType) =
         printfn $"Exclusions:          %d{settings.Exclusions.Length}"
         printfn $"Artist Replacements: %d{settings.ArtistReplacements.Length}"
         printfn $"Title Replacements:  %d{settings.TitleReplacements.Length}"
 
 module Tags =
+    open Errors
     open Utilities
-    open Settings // TODO: Refactor to avoid?
+    open Settings
 
     [<Literal>]
     let private tagSample = """
@@ -115,14 +110,30 @@ module Tags =
     type TagCollection = FileTags array
     type FilteredTagCollection = FileTags array
 
-    let printTotalTagCount (tags: TagCollection) =
-        printfn $"Total file count:    %s{formatNumber tags.Length}"
+    let confirmFileExists (fileName: string) : Result<FileInfo,Error> =
+        let fileInfo = FileInfo fileName
+        if fileInfo.Exists
+        then Ok fileInfo
+        else Error (FileMissing fileInfo.FullName)
 
-    let printFilteredTagCount (tags: FilteredTagCollection) =
-        printfn $"Filtered file count: %s{formatNumber tags.Length}"
+    let readFile (fileInfo: FileInfo) : Result<string, Error> =
+        try
+            fileInfo.FullName
+            |> System.IO.File.ReadAllText
+            |> Ok
+        with
+        | e -> Error (IoError e.Message)
 
-    module Filtering =
-        let private excludeFile (settings: SettingsType) (file: FileTags) =
+    let parseJsonToTags (json: string) : Result<TagCollection, Error> =
+        try
+            json
+            |> TagJsonProvider.Parse
+            |> Ok
+        with
+        | e -> Error (ParseError e.Message)
+
+    let filter (settings: SettingsType) (allTags: TagCollection) : FileTags array =
+        let excludeFile (settings: SettingsType) (file: FileTags) =
             let contains (target: string) (collection: string seq) =
                 collection
                 |> Seq.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, target))
@@ -148,9 +159,8 @@ module Tags =
             settings.Exclusions
             |> Array.exists isExcluded
 
-        let filterTags (settings: SettingsType) (allTags: TagCollection) =
-            allTags
-            |> Array.filter (fun x -> not <| excludeFile settings x)
+        allTags
+        |> Array.filter (fun x -> not <| excludeFile settings x)
 
     let findDuplicates
         (settings: SettingsType)
@@ -176,6 +186,12 @@ module Tags =
             $"{artists}{title}")
         |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
 
+    let printTotalCount (tags: TagCollection) =
+        printfn $"Total file count:    %s{formatNumber tags.Length}"
+
+    let printFilteredCount (tags: FilteredTagCollection) =
+        printfn $"Filtered file count: %s{formatNumber tags.Length}"
+
     let printResults (groupedTracks: (string * FilteredTagCollection) array) =
         groupedTracks
         |> Array.iteri (fun i groupedTracks ->
@@ -192,50 +208,30 @@ module Tags =
             |> snd
             |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
 
-module IO =
-    open Errors
-    open Tags
-
-    let readFile (fileInfo: FileInfo) : Result<string, Error> =
-        try
-            fileInfo.FullName
-            |> System.IO.File.ReadAllText
-            |> Ok
-        with
-        | e -> Error (IoError e.Message)
-
-    let parseJsonToTags (json: string) : Result<TagCollection, Error> =
-        try
-            json
-            |> TagJsonProvider.Parse
-            |> Ok
-        with
-        | e -> Error (ParseError e.Message)
-
 module Operators =
     let (>>=) result func = Result.bind func result
     let (<!>) result func = Result.map func result
     let (<.>) result func = Result.tee func result
 
+open ArgValidation
 open Errors
-open Settings
 open Tags
-open Filtering
+open Settings
 open Operators
 
 let run () =
     result {
-        let! settings =
-            Settings.load ()
-            <.> summarize
+        let! settings = Settings.load () <.> printSummary
 
         return
-            ArgValidation.validateFilePath ()
-            >>= IO.readFile
-            >>= IO.parseJsonToTags
-            <.> printTotalTagCount
-            <!> filterTags settings
-            <.> printFilteredTagCount
+            fsi.CommandLineArgs
+            |> validateArgCount
+            >>= confirmFileExists
+            >>= readFile
+            >>= parseJsonToTags
+            <.> printTotalCount
+            <!> filter settings
+            <.> printFilteredCount
             <!> findDuplicates settings
             <.> printResults
     }
