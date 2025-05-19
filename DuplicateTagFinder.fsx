@@ -38,6 +38,11 @@ module Utilities =
             text
             substrings
 
+    let anyContains (collections: (string seq) seq) (target: string) : bool =
+        collections
+        |> Seq.concat
+        |> Seq.exists (fun text -> StringComparer.InvariantCultureIgnoreCase.Equals(text, target))
+
 module IO =
     open Errors
     open Operators
@@ -141,19 +146,15 @@ module Tags =
 
     let filter (settings: SettingsRoot) (allTags: TagCollection) : FileTags array =
         let excludeFile (settings: SettingsRoot) (file: FileTags) =
-            let contains (target: string) (collection: string seq) =
-                collection
-                |> Seq.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, target))
-
-            let isExcluded (rule: SettingsProvider.Exclusion) =
-                match rule.Artist, rule.Title with
-                | Some excludedArtist, Some excludedTitle ->
-                    (contains excludedArtist file.AlbumArtists || contains excludedArtist file.Artists) &&
-                    file.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
-                | Some excludedArtist, None ->
-                    contains excludedArtist file.AlbumArtists || contains excludedArtist file.Artists
-                | None, Some excludedTitle ->
-                    file.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
+            let isExcluded (exclusion: SettingsProvider.Exclusion) =
+                match exclusion.Artist, exclusion.Title with
+                | Some a, Some t ->
+                    anyContains [file.AlbumArtists; file.Artists] a &&
+                    file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+                | Some a, None ->
+                    anyContains [file.AlbumArtists; file.Artists] a
+                | None, Some t ->
+                    file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
                 | _ -> false
 
             settings.Exclusions
