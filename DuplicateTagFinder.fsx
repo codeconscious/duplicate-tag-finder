@@ -13,30 +13,24 @@ module Errors =
         | InvalidArgCount
         | FileMissing of string
         | IoError of string
-        | ParseError of string
+        | SettingsParseError of string
+        | TagParseError of string
 
     let message: Error -> string = function
         | InvalidArgCount -> "Invalid arguments. Pass in two JSON filename paths: (1) your settings file and (2) your cached tag data."
         | FileMissing fileName -> $"The file \"{fileName}\" was not found."
         | IoError msg -> $"I/O failure: {msg}"
-        | ParseError msg -> $"Could not parse the file: {msg}"
+        | SettingsParseError msg -> $"Unable to parse the settings file: {msg}"
+        | TagParseError msg -> $"Unable to parse the tag file: {msg}"
 
 module Operators =
     let (>>=) result func = Result.bind func result
     let (<!>) result func = Result.map func result
     let (<.>) result func = Result.tee func result
 
-
 module Utilities =
-    let extractText (x: Runtime.BaseTypes.IJsonDocument) : string =
-        x.JsonValue.InnerText()
-
-    let joinWithSeparator (separator: string) (xs: Runtime.BaseTypes.IJsonDocument array) =
-        let texts = Array.map extractText xs
-        String.Join(separator, texts)
-
     let formatNumber (i: int) =
-        i.ToString("N0", CultureInfo.InvariantCulture)
+        i.ToString("N0", CultureInfo.InvariantCulture) // Sample: 1,000
 
     let removeSubstrings (substrings: string array) (text: string) : string =
         Array.fold
@@ -67,68 +61,43 @@ module ArgValidation =
 
 module Settings =
     open Errors
-    open Utilities
 
     [<Literal>]
     let settingsSample = """
     {
         "exclusions": [
             {
-                "artist": ""
+                "artist": "artist"
             },
             {
-                "title": ""
+                "title": "title"
             },
             {
-                "artist": "",
-                "title": ""
+                "artist": "artist",
+                "title": "title"
             }
         ],
         "artistReplacements": [
-            ""
+            "text"
         ],
         "titleReplacements": [
-            ""
+            "text"
         ]
     }
     """
 
     type SettingsProvider = JsonProvider<settingsSample>
     type SettingsRoot = SettingsProvider.Root
-    type Exclusion = SettingsProvider.Exclusion
 
-    type ExclusionPair =
-        { Artist: string option
-          Title: string option }
-
-    type SettingsType =
-        { Exclusions: ExclusionPair array
-          ArtistReplacements: string array
-          TitleReplacements: string array }
-
-    let toSettings (settings: SettingsRoot) : SettingsType =
-        let toExclusionPair (e: Exclusion) =
-            {
-                Artist = Some (extractText e.Artist)
-                Title = Some (extractText e.Title)
-            }
-
-        {
-            Exclusions = settings.Exclusions |> Array.map toExclusionPair
-            ArtistReplacements = settings.ArtistReplacements |> Array.map extractText
-            TitleReplacements = settings.TitleReplacements |> Array.map extractText
-        }
-
-    let parseJsonToSettings (json: string) : Result<SettingsType, Error> =
+    let parseToSettings (json: string) : Result<SettingsRoot, Error> =
         try
             json
             |> SettingsProvider.Parse
-            |> toSettings
             |> Ok
         with
-        | e -> Error (IoError e.Message)
+        | e -> Error (SettingsParseError e.Message)
 
-    let printSummary (settings: SettingsType) =
+    let printSummary (settings: SettingsRoot) =
         printfn "Settings summary:"
         printfn $"  Exclusions:          %d{settings.Exclusions.Length}"
         printfn $"  Artist Replacements: %d{settings.ArtistReplacements.Length}"
@@ -143,15 +112,15 @@ module Tags =
     let private tagSample = """
     [
       {
-        "FileName": "",
-        "DirectoryName": "",
-        "Artists": [],
-        "AlbumArtists": [],
-        "Album": "",
+        "FileName": "text",
+        "DirectoryName": "text",
+        "Artists": ["text"],
+        "AlbumArtists": ["text"],
+        "Album": "text",
         "TrackNo": 0,
-        "Title": "",
+        "Title": "text",
         "Year": 0,
-        "Genres": [],
+        "Genres": ["text"],
         "Duration": "00:00:00",
         "LastWriteTime": "2023-09-13T13:49:44+09:00"
       }
@@ -162,36 +131,29 @@ module Tags =
     type TagCollection = FileTags array
     type FilteredTagCollection = FileTags array
 
-    let parseJsonToTags (json: string) : Result<TagCollection, Error> =
+    let parseToTags (json: string) : Result<TagCollection, Error> =
         try
             json
             |> TagJsonProvider.Parse
             |> Ok
         with
-        | e -> Error (ParseError e.Message)
+        | e -> Error (TagParseError e.Message)
 
-    let filter (settings: SettingsType) (allTags: TagCollection) : FileTags array =
-        let excludeFile (settings: SettingsType) (file: FileTags) =
+    let filter (settings: SettingsRoot) (allTags: TagCollection) : FileTags array =
+        let excludeFile (settings: SettingsRoot) (file: FileTags) =
             let contains (target: string) (collection: string seq) =
                 collection
                 |> Seq.exists (fun x -> StringComparer.InvariantCultureIgnoreCase.Equals(x, target))
 
-            let tags =
-                {|
-                    AlbumArtists = Seq.map extractText file.AlbumArtists
-                    Artists = Seq.map extractText file.Artists
-                    Title = extractText file.Title
-                |}
-
-            let isExcluded rule =
+            let isExcluded (rule: SettingsProvider.Exclusion) =
                 match rule.Artist, rule.Title with
                 | Some excludedArtist, Some excludedTitle ->
-                    (contains excludedArtist tags.AlbumArtists || contains excludedArtist tags.Artists) &&
-                    tags.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
+                    (contains excludedArtist file.AlbumArtists || contains excludedArtist file.Artists) &&
+                    file.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
                 | Some excludedArtist, None ->
-                    contains excludedArtist tags.AlbumArtists || contains excludedArtist tags.Artists
+                    contains excludedArtist file.AlbumArtists || contains excludedArtist file.Artists
                 | None, Some excludedTitle ->
-                    tags.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
+                    file.Title.StartsWith(excludedTitle, StringComparison.InvariantCultureIgnoreCase)
                 | _ -> false
 
             settings.Exclusions
@@ -201,25 +163,22 @@ module Tags =
         |> Array.filter (fun x -> not <| excludeFile settings x)
 
     let findDuplicates
-        (settings: SettingsType)
+        (settings: SettingsRoot)
         (tags: FilteredTagCollection)
         : (string * FilteredTagCollection) array
         =
         tags
         |> Array.filter (fun track ->
             let hasArtists = track.Artists.Length > 0
-            let titleText = extractText track.Title
-            let hasTitle = not (String.IsNullOrWhiteSpace titleText)
+            let hasTitle = not <| String.IsNullOrWhiteSpace track.Title
             hasArtists && hasTitle)
         |> Array.groupBy (fun track ->
             let artists =
                 track.Artists
-                |> Array.map extractText
                 |> String.Concat
                 |> removeSubstrings settings.ArtistReplacements
             let title =
                 track.Title
-                |> extractText
                 |> removeSubstrings settings.TitleReplacements
             $"{artists}{title}")
         |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
@@ -241,7 +200,7 @@ module Tags =
                 |> snd
                 |> Array.head
                 |> _.Artists
-                |> joinWithSeparator ", "
+                |> (fun x -> String.Join(", ", x))
                 |> printfn "%d. %s" (i + 1) // Start at 1.
 
                 // Print each possible-duplicate track in the group.
@@ -249,12 +208,12 @@ module Tags =
                 |> snd
                 |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
 
+open Operators
 open ArgValidation
 open Errors
 open IO
 open Tags
 open Settings
-open Operators
 
 let run () =
     result {
@@ -263,13 +222,13 @@ let run () =
         let! settings =
             settingsFile
             |> readFile
-            >>= parseJsonToSettings
+            >>= parseToSettings
             <.> printSummary
 
         return
             cachedTagFile
             |> readFile
-            >>= parseJsonToTags
+            >>= parseToTags
             <.> printTotalCount
             <!> filter settings
             <.> printFilteredCount
