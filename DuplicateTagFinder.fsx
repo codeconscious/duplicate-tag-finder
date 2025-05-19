@@ -59,7 +59,7 @@ module IO =
 module ArgValidation =
     open Errors
 
-    let validate (args: string array) : Result<string * string, Error> =
+    let validate (args: 'a array) : Result<'a * 'a, Error> =
         if args.Length <> 3 // Index 0 is the name of the script itself.
         then Error InvalidArgCount
         else Ok (args[1], args[2])
@@ -157,11 +157,9 @@ module Tags =
                     file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
                 | _ -> false
 
-            settings.Exclusions
-            |> Array.exists isExcluded
+            settings.Exclusions |> Array.exists isExcluded
 
-        allTags
-        |> Array.filter (fun x -> not <| excludeFile settings x)
+        allTags |> Array.filter (not << excludeFile settings)
 
     let findDuplicates
         (settings: SettingsRoot)
@@ -195,18 +193,16 @@ module Tags =
         then printfn "No duplicates found."
         else
             groupedTracks
-            |> Array.iteri (fun i groupTracks ->
+            |> Array.iteri (fun i (_, groupTracks) ->
                 // Print the artist(s) using the group's first file's artist(s).
                 groupTracks
-                |> snd
                 |> Array.head
                 |> _.Artists
-                |> (fun x -> String.Join(", ", x))
+                |> fun x -> String.Join(", ", x)
                 |> printfn "%d. %s" (i + 1) // Start at 1.
 
                 // Print each possible-duplicate track in the group.
                 groupTracks
-                |> snd
                 |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
 
 open Operators
