@@ -17,12 +17,14 @@ module Errors =
         | MediaDirectoryMissing of string
         | IoError of string
         | ParseError of string
+        | JsonSerializationError of string
 
     let message = function
         | InvalidArgCount -> "Invalid arguments. Pass in (1) the directory containing audio files and (2) a path to a JSON file containing cached tag data."
         | MediaDirectoryMissing msg -> $"The directory \"{msg}\" was not found."
         | IoError msg -> $"I/O failure: {msg}"
         | ParseError msg -> $"Parse error: {msg}"
+        | JsonSerializationError msg -> $"JSON serialization error: {msg}"
 
 module Operators =
     let (>>=) result func = Result.bind func result
@@ -38,25 +40,23 @@ module ArgValidation =
         else Ok (DirectoryInfo args[1], FileInfo args[2])
 
 module Utilities =
+    open Errors
     open System.Text.Json
     open System.Text.Encodings.Web
     open System.Text.Unicode
-
-    let extractText (x: Runtime.BaseTypes.IJsonDocument) =
-        x.JsonValue.InnerText()
-
-    let joinWithSeparator (separator: string) (xs: Runtime.BaseTypes.IJsonDocument array) =
-        let texts = Array.map extractText xs
-        String.Join(separator, texts)
 
     let formatWithCommas (i: int) =
         i.ToString("N0", CultureInfo.InvariantCulture)
 
     let serializeToJson items =
-        let serializerOptions = JsonSerializerOptions()
-        serializerOptions.WriteIndented <- true
-        serializerOptions.Encoder <- JavaScriptEncoder.Create UnicodeRanges.All
-        JsonSerializer.Serialize(items, serializerOptions)
+        try
+            let serializerOptions = JsonSerializerOptions()
+            serializerOptions.WriteIndented <- true
+            serializerOptions.Encoder <- JavaScriptEncoder.Create UnicodeRanges.All
+            JsonSerializer.Serialize(items, serializerOptions)
+            |> Ok
+        with
+        | e -> Error (JsonSerializationError e.Message)
 
 module IO =
     open Errors
@@ -296,7 +296,7 @@ let run () =
         let! mediaDir, cachedTagFile = ArgValidation.validate fsi.CommandLineArgs
         let! fileInfos = getFileInfos mediaDir
         let! cachedTagMap = createCachedTagMap cachedTagFile
-        let newJson = generateNewJson cachedTagMap fileInfos
+        let! newJson = generateNewJson cachedTagMap fileInfos
 
         let! _ = copyToBackupFile cachedTagFile
         do! writeFile cachedTagFile.FullName newJson
