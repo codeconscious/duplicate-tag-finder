@@ -12,28 +12,30 @@ open System.IO
 type TaggedFile = TagLib.File
 
 module Errors =
-    type Errors =
+    type Error =
         | InvalidArgCount
         | MediaDirectoryMissing of string
         | IoError of string
+        | ParseError of string
 
     let message = function
         | InvalidArgCount -> "Invalid arguments. Pass in (1) the directory containing audio files and (2) a path to a JSON file containing cached tag data."
-        | MediaDirectoryMissing e -> $"The directory \"{e}\" was not found."
-        | IoError e -> $"I/O failure: {e}"
+        | MediaDirectoryMissing msg -> $"The directory \"{msg}\" was not found."
+        | IoError msg -> $"I/O failure: {msg}"
+        | ParseError msg -> $"Parse error: {msg}"
+
+module Operators =
+    let (>>=) result func = Result.bind func result
+    let (<!>) result func = Result.map func result
+    let (<.>) result func = Result.tee func result
 
 module ArgValidation =
     open Errors
 
-    let validate =
-        if fsi.CommandLineArgs.Length <> 3 // Index 0 is the name of the script itself.
+    let validate (args: string array) : Result<DirectoryInfo * FileInfo, Error> =
+        if args.Length <> 3 // Index 0 is the name of the script itself.
         then Error InvalidArgCount
-        else
-            let mediaDir, cachedTagFile = DirectoryInfo fsi.CommandLineArgs[1], FileInfo fsi.CommandLineArgs[2]
-
-            if not mediaDir.Exists
-            then Error (MediaDirectoryMissing mediaDir.FullName)
-            else Ok (mediaDir, cachedTagFile)
+        else Ok (DirectoryInfo args[1], FileInfo args[2])
 
 module Utilities =
     open System.Text.Json
@@ -59,6 +61,15 @@ module Utilities =
 module IO =
     open Errors
 
+    // Transplanted this.
+    let readFile (fileName: string) : Result<string, Error> =
+        try
+            fileName
+            |> System.IO.File.ReadAllText
+            |> Ok
+        with
+        | e -> Error (IoError e.Message)
+
     let getFileInfos (dirPath: DirectoryInfo) =
         let isSupportedAudioFile (fileInfo: FileInfo) =
             [".mp3"; ".m4a"; ".mp4"; ".ogg"; ".flac"]
@@ -76,7 +87,8 @@ module IO =
 
     let writeFile (fileName: string) (content: string) =
         try
-            Ok (File.WriteAllText(fileName, content))
+            File.WriteAllText(fileName, content)
+            |> Ok
         with
         | e -> Error (IoError e.Message)
 
@@ -107,7 +119,9 @@ module IO =
 
 module Tags =
     open IO
+    open Operators
     open Utilities
+    open Errors
 
     type FileTags =
         {
@@ -129,45 +143,52 @@ module Tags =
         | Updated
         | Added
 
-    type CheckResultWithFileTags = CheckResult * FileTags
-
     [<Literal>]
     let private tagSample = """
     [
       {
-        "FileNameOnly": "",
-        "DirectoryName": "",
-        "Artists": [""],
-        "AlbumArtists": [""],
-        "Album": "",
+        "FileNameOnly": "name",
+        "DirectoryName": "name",
+        "Artists": ["name"],
+        "AlbumArtists": ["name"],
+        "Album": "name",
         "TrackNo": 0,
-        "Title": "",
+        "Title": "name",
         "Year": 0,
-        "Genres": [""],
+        "Genres": ["name"],
         "Duration": "00:00:00",
         "LastWriteTime": "2023-09-13T13:49:44+09:00"
       }
     ]"""
 
-    type CachedTags = JsonProvider<tagSample>
-    type FileNameWithCachedTags = Map<string, JsonProvider<tagSample>.Root>
+    type CachedTagProvider = JsonProvider<tagSample>
+    type CachedTagRoot = CachedTagProvider.Root
+    // type CachedTagRoots = CachedTagRoot array
+    type FileNameWithCachedTags = Map<string, CachedTagRoot>
 
-    let parseCachedTagData filePath =
-        CachedTags.Parse filePath
+    type CheckResultWithFileTags = CheckResult * FileTags
 
-    let audioFilePath (tags: CachedTags.Root) =
-        Path.Combine [| extractText tags.DirectoryName; extractText tags.FileNameOnly |]
+    let parseCachedTagData json : Result<CachedTagRoot array, Error> =
+        try
+            json
+            |> CachedTagProvider.Parse
+            |> Ok
+        with
+        | e -> Error (ParseError e.Message)
 
-    let createCachedTagMap (cachedTagFile: FileInfo) : FileNameWithCachedTags =
+    let audioFilePath (tags: CachedTagRoot) =
+        Path.Combine [| tags.DirectoryName; tags.FileNameOnly |]
+
+    let createCachedTagMap (cachedTagFile: FileInfo) : Result<Map<string, CachedTagRoot>, Error> =
         if cachedTagFile.Exists
         then
             cachedTagFile.FullName
-            |> System.IO.File.ReadAllText
-            |> parseCachedTagData
-            |> Array.map (fun tags -> audioFilePath tags, tags)
-            |> Map.ofArray
+            |> readFile
+            >>= parseCachedTagData
+            <!> Array.map (fun tags -> audioFilePath tags, tags)
+            <!> Map.ofArray
         else
-            Map.empty
+            Ok Map.empty
 
     let compareAndUpdateTagData
         (cachedTags: FileNameWithCachedTags)
@@ -214,17 +235,17 @@ module Tags =
                     LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
                 }
 
-        let useExistingTagData (cached: CachedTags.Root) =
+        let useExistingTagData (cached: CachedTagProvider.Root) =
             {
-                FileNameOnly = cached.FileNameOnly |> extractText
-                DirectoryName = cached.DirectoryName |> extractText
-                Artists = cached.Artists |> Array.map extractText
-                AlbumArtists = cached.AlbumArtists |> Array.map extractText
-                Album = cached.Album |> extractText
+                FileNameOnly = cached.FileNameOnly
+                DirectoryName = cached.DirectoryName
+                Artists = cached.Artists
+                AlbumArtists = cached.AlbumArtists
+                Album = cached.Album
                 TrackNo = uint cached.TrackNo
-                Title = cached.Title |> extractText
+                Title = cached.Title
                 Year = uint cached.Year
-                Genres = cached.Genres |> Array.map extractText
+                Genres = cached.Genres
                 Duration = cached.Duration
                 LastWriteTime = DateTimeOffset cached.LastWriteTime.DateTime
             }
@@ -272,9 +293,9 @@ open Tags
 
 let run () =
     result {
-        let! mediaDir, cachedTagFile = ArgValidation.validate
+        let! mediaDir, cachedTagFile = ArgValidation.validate fsi.CommandLineArgs
         let! fileInfos = getFileInfos mediaDir
-        let cachedTagMap = createCachedTagMap cachedTagFile
+        let! cachedTagMap = createCachedTagMap cachedTagFile
         let newJson = generateNewJson cachedTagMap fileInfos
 
         let! _ = copyToBackupFile cachedTagFile
