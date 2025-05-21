@@ -15,13 +15,17 @@ module Errors =
     type Error =
         | InvalidArgCount
         | MediaDirectoryMissing of string
+        | ReadFileError of string
+        | WriteFileError of string
         | IoError of string
         | ParseError of string
         | JsonSerializationError of string
 
     let message = function
-        | InvalidArgCount -> "Invalid arguments. Pass in (1) the directory containing audio files and (2) a path to a JSON file containing cached tag data."
-        | MediaDirectoryMissing msg -> $"The directory \"{msg}\" was not found."
+        | InvalidArgCount -> "Invalid arguments. Pass in (1) the directory containing your audio files and (2) a path to a JSON file containing cached tag data."
+        | MediaDirectoryMissing msg -> $"Directory \"{msg}\" was not found."
+        | ReadFileError msg -> $"Read failure: {msg}"
+        | WriteFileError msg -> $"Write failure: {msg}"
         | IoError msg -> $"I/O failure: {msg}"
         | ParseError msg -> $"Parse error: {msg}"
         | JsonSerializationError msg -> $"JSON serialization error: {msg}"
@@ -67,7 +71,7 @@ module IO =
             |> System.IO.File.ReadAllText
             |> Ok
         with
-        | e -> Error (IoError e.Message)
+        | e -> Error (ReadFileError e.Message)
 
     let getFileInfos (dirPath: DirectoryInfo) =
         let isSupportedAudioFile (fileInfo: FileInfo) =
@@ -89,7 +93,7 @@ module IO =
             File.WriteAllText(fileName, content)
             |> Ok
         with
-        | e -> Error (IoError e.Message)
+        | e -> Error (WriteFileError e.Message)
 
     let generateBackUpFilePath (cachedTagFile: FileInfo) =
         let baseName = Path.GetFileNameWithoutExtension cachedTagFile.Name
@@ -113,7 +117,7 @@ module IO =
                 |> Some
                 |> Ok
             with
-            | e -> Error (IoError $"Could not create backup file: {e.Message}")
+            | e -> Error (IoError $"Could not create tag backup file: {e.Message}")
         else Ok None
 
 module Tags =
