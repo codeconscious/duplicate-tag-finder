@@ -29,15 +29,14 @@ module Errors =
 module Operators =
     let (>>=) result func = Result.bind func result
     let (<!>) result func = Result.map func result
-    let (<.>) result func = Result.tee func result
 
 module ArgValidation =
     open Errors
 
     let validate (args: string array) : Result<DirectoryInfo * FileInfo, Error> =
-        if args.Length <> 3 // Index 0 is the name of the script itself.
-        then Error InvalidArgCount
-        else Ok (DirectoryInfo args[1], FileInfo args[2])
+        if args.Length = 3 // Index 0 is the name of the script itself.
+        then Ok (DirectoryInfo args[1], FileInfo args[2])
+        else Error InvalidArgCount
 
 module Utilities =
     open Errors
@@ -123,7 +122,7 @@ module Tags =
     open Utilities
     open Errors
 
-    type FileTags =
+    type NewTags =
         {
             FileNameOnly: string
             DirectoryName: string
@@ -141,7 +140,7 @@ module Tags =
     type CheckResult =
         | Unchanged
         | Updated
-        | Added
+        | New
 
     [<Literal>]
     let private tagSample = """
@@ -163,10 +162,8 @@ module Tags =
 
     type CachedTagProvider = JsonProvider<tagSample>
     type CachedTagRoot = CachedTagProvider.Root
-    // type CachedTagRoots = CachedTagRoot array
     type FileNameWithCachedTags = Map<string, CachedTagRoot>
-
-    type CheckResultWithFileTags = CheckResult * FileTags
+    type CheckResultWithFileTags = CheckResult * NewTags
 
     let parseCachedTagData json : Result<CachedTagRoot array, Error> =
         try
@@ -176,7 +173,7 @@ module Tags =
         with
         | e -> Error (ParseError e.Message)
 
-    let audioFilePath (tags: CachedTagRoot) =
+    let audioFilePath (tags: CachedTagRoot) : string =
         Path.Combine [| tags.DirectoryName; tags.FileNameOnly |]
 
     let createCachedTagMap (cachedTagFile: FileInfo) : Result<Map<string, CachedTagRoot>, Error> =
@@ -196,9 +193,9 @@ module Tags =
         : CheckResultWithFileTags seq
         =
         let createNewTagData (fileInfo: FileInfo) =
-            let newestTags = readFileTags fileInfo.FullName
+            let currentTags = readFileTags fileInfo.FullName
 
-            if newestTags.Tag = null
+            if currentTags.Tag = null
             then
                 {
                     FileNameOnly = fileInfo.Name
@@ -217,37 +214,37 @@ module Tags =
                 {
                     FileNameOnly = fileInfo.Name
                     DirectoryName = fileInfo.DirectoryName
-                    Artists = if newestTags.Tag.Performers = null
+                    Artists = if currentTags.Tag.Performers = null
                               then [| String.Empty |]
-                              else newestTags.Tag.Performers
+                              else currentTags.Tag.Performers
                                    |> Array.map (fun p -> p.Normalize())
-                    AlbumArtists = if newestTags.Tag.AlbumArtists = null
+                    AlbumArtists = if currentTags.Tag.AlbumArtists = null
                                    then [| String.Empty |]
-                                   else newestTags.Tag.AlbumArtists |> Array.map (fun p -> p.Normalize())
-                    Album = if newestTags.Tag.Album = null
+                                   else currentTags.Tag.AlbumArtists |> Array.map (fun p -> p.Normalize())
+                    Album = if currentTags.Tag.Album = null
                             then String.Empty
-                            else newestTags.Tag.Album.Normalize()
-                    TrackNo = newestTags.Tag.Track
-                    Title = newestTags.Tag.Title
-                    Year = newestTags.Tag.Year
-                    Genres = newestTags.Tag.Genres
-                    Duration = newestTags.Properties.Duration
+                            else currentTags.Tag.Album.Normalize()
+                    TrackNo = currentTags.Tag.Track
+                    Title = currentTags.Tag.Title
+                    Year = currentTags.Tag.Year
+                    Genres = currentTags.Tag.Genres
+                    Duration = currentTags.Properties.Duration
                     LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
                 }
 
-        let useExistingTagData (cached: CachedTagProvider.Root) =
+        let useExistingTagData (cachedTags: CachedTagRoot) =
             {
-                FileNameOnly = cached.FileNameOnly
-                DirectoryName = cached.DirectoryName
-                Artists = cached.Artists
-                AlbumArtists = cached.AlbumArtists
-                Album = cached.Album
-                TrackNo = uint cached.TrackNo
-                Title = cached.Title
-                Year = uint cached.Year
-                Genres = cached.Genres
-                Duration = cached.Duration
-                LastWriteTime = DateTimeOffset cached.LastWriteTime.DateTime
+                FileNameOnly = cachedTags.FileNameOnly
+                DirectoryName = cachedTags.DirectoryName
+                Artists = cachedTags.Artists
+                AlbumArtists = cachedTags.AlbumArtists
+                Album = cachedTags.Album
+                TrackNo = uint cachedTags.TrackNo
+                Title = cachedTags.Title
+                Year = uint cachedTags.Year
+                Genres = cachedTags.Genres
+                Duration = cachedTags.Duration
+                LastWriteTime = DateTimeOffset cachedTags.LastWriteTime.DateTime
             }
 
         let updateTags (cachedTags: FileNameWithCachedTags) (fileInfo: FileInfo) : CheckResultWithFileTags =
@@ -257,7 +254,7 @@ module Tags =
                 if fileCachedTags.LastWriteTime.DateTime < fileInfo.LastWriteTime
                 then Updated, (createNewTagData fileInfo)
                 else Unchanged, (useExistingTagData fileCachedTags)
-            else Added, (createNewTagData fileInfo)
+            else New, (createNewTagData fileInfo)
 
         fileInfos
         |> Seq.map (fun fileInfo -> updateTags cachedTags fileInfo)
@@ -269,14 +266,15 @@ module Tags =
             (initialCounts, results |> Seq.map fst)
             ||> Seq.fold (fun acc result ->
                 match result with
-                | Added -> {| acc with Added = acc.Added + 1 |}
+                | New -> {| acc with Added = acc.Added + 1 |}
                 | Updated -> {| acc with Updated = acc.Updated + 1 |}
                 | Unchanged -> {| acc with Unchanged = acc.Unchanged + 1 |})
 
         printfn "Results:"
-        printfn "• Added:     %s" (formatWithCommas totals.Added)
+        printfn "• New:       %s" (formatWithCommas totals.Added)
         printfn "• Updated:   %s" (formatWithCommas totals.Updated)
         printfn "• Unchanged: %s" (formatWithCommas totals.Unchanged)
+        printfn "• Total:     %s" (formatWithCommas (Seq.length results))
 
         results
 
@@ -293,13 +291,13 @@ open Tags
 
 let run () =
     result {
-        let! mediaDir, cachedTagFile = ArgValidation.validate fsi.CommandLineArgs
+        let! mediaDir, tagCacheFile = ArgValidation.validate fsi.CommandLineArgs
         let! fileInfos = getFileInfos mediaDir
-        let! cachedTagMap = createCachedTagMap cachedTagFile
+        let! cachedTagMap = createCachedTagMap tagCacheFile
         let! newJson = generateNewJson cachedTagMap fileInfos
 
-        let! _ = copyToBackupFile cachedTagFile
-        do! writeFile cachedTagFile.FullName newJson
+        let! _ = copyToBackupFile tagCacheFile
+        do! writeFile tagCacheFile.FullName newJson
     }
 
 let watch = Startwatch.Library.Watch()
