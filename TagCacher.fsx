@@ -64,7 +64,6 @@ module Utilities =
 module IO =
     open Errors
 
-    // Transplanted this.
     let readFile (fileName: string) : Result<string, Error> =
         try
             fileName
