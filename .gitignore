@@ -1,2 +1,5 @@
 *.json
+
+# IDE-related
 .idea/
+.fake
