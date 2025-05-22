@@ -16,8 +16,8 @@ I mainly created these to practice with F# [JSON type providers](https://fsproje
 ## TagCacher
 
 Pass two arguments to TagCacher.fsx:
-1. The directory containing your audio files
-2. The file that contains (or will contain, if it does not exist yet) your cached audio tags
+1. The path of the directory containing your audio files
+2. The path of the file that contains (or will contain, if it does not exist yet) your cached audio tags
 
 Run the script like this:
 
@@ -56,6 +56,9 @@ First, you must have a settings JSON file that contains the cached tag data to s
 (This is the same format that the `--cache-tags` option of [my AudioTagger utility](https://github.com/codeconscious/audiotagger) outputs.)
 
 Second, you must have a settings file prepared as well. I have provided a sample below.
+
+<details>
+  <summary>Click to expand!</summary>
 
 ```json
 {
@@ -134,8 +137,9 @@ Second, you must have a settings file prepared as well. I have provided a sample
   ]
 }
 ```
+</details>
 
-Pass the settings file and tag-cached file to the script (in that order) like this:
+Pass the (1) the settings file path and (2) the cached-tag file path (in that order) to the script like this:
 
 ```sh
 dotnet fsi DuplicateTagFinder.fsx "/Users/me/Documents/duplicate-finder-settings.json" "/Users/me/Downloads/Music/library.json"
