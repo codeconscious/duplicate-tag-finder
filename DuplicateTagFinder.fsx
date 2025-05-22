@@ -38,7 +38,7 @@ module Utilities =
             text
             substrings
 
-    let anyContains (collections: (string seq) seq) (target: string) : bool =
+    let anyContain (collections: (string seq) seq) (target: string) : bool =
         collections
         |> Seq.concat
         |> Seq.exists (fun text -> StringComparer.InvariantCultureIgnoreCase.Equals(text, target))
@@ -149,10 +149,10 @@ module Tags =
             let isExcluded (exclusion: SettingsProvider.Exclusion) =
                 match exclusion.Artist, exclusion.Title with
                 | Some a, Some t ->
-                    anyContains [file.AlbumArtists; file.Artists] a &&
+                    anyContain [file.AlbumArtists; file.Artists] a &&
                     file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
                 | Some a, None ->
-                    anyContains [file.AlbumArtists; file.Artists] a
+                    anyContain [file.AlbumArtists; file.Artists] a
                 | None, Some t ->
                     file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
                 | _ -> false
