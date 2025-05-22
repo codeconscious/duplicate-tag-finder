@@ -1,34 +1,35 @@
-# Cached Tag Creater and Duplicate Finder
+# Tag Cacher and Duplicate Finder
 
-This is a pair of F# scripts that do two things:
-- Cache the audio metadata (i.e., tags) in audio files from a specified directory to a specified file on your computer
-- Parse the cached data and reports on likely duplicates
+This is a pair of F# scripts that each do one task:
+1. **TagCacher** caches the audio metadata tags in supported audio files within a specified directory to a file on your computer
+2. **DuplicateTagFinder** parses those cached tags and reports likely duplicates, based on the provided settings
 
-I mainly created these to practice with [JSON type providers](https://fsprojects.github.io/FSharp.Data/library/JsonProvider.html) in F#.
+I mainly created these to practice with F# [JSON type providers](https://fsprojects.github.io/FSharp.Data/library/JsonProvider.html), but they do resolve a small pain point for me as well.
 
 # Requirements
 
 - [.NET 9 runtime](https://dotnet.microsoft.com/en-us/download/dotnet/9.0)
-- Duplicate search only: a JSON settings file
+- JSON settings file (DuplicateTagFinder only)
 
 # Running
 
-## Caching tags
+## TagCacher
 
 Pass two arguments to TagCacher.fsx:
-1. The directory containing your audio file
-2. The file that contains (or will contain) your cached audio tags (It need not exist yet)
+1. The directory containing your audio files
+2. The file that contains (or will contain, if it does not exist yet) your cached audio tags
 
+Run the script like this:
 
 ```sh
 dotnet fsi TagCacher.fsx "/Users/me/Documents/Audio" "/Users/me/Documents/Audio/tagCache.json"
 ```
 
-If the specified file already exists, it will automatically be backed up in the same directory.
+If the specified tag file already exists, it will automatically be backed up in the same directory before a new one is created.
 
-## Finding duplicates
+## DuplicateTagFinder
 
-First, you must already have a JSON file that contains the tag data that you wish to examine, and it must in this format:
+First, you must have a settings JSON file that contains the cached tag data to search through, and it must in this format:
 
 ```json
 [
@@ -54,7 +55,7 @@ First, you must already have a JSON file that contains the tag data that you wis
 
 (This is the same format that the `--cache-tags` option of [my AudioTagger utility](https://github.com/codeconscious/audiotagger) outputs.)
 
-Second, you must have a settings file in the script directory. I have provided a sample below.
+Second, you must have a settings file prepared as well. I have provided a sample below.
 
 ```json
 {
@@ -134,10 +135,10 @@ Second, you must have a settings file in the script directory. I have provided a
 }
 ```
 
-After everything is set up, just run the following command:
+Pass the settings file and tag-cached file to the script (in that order) like this:
 
-```
-dotnet fsi DuplicateTagFinder.fsx
+```sh
+dotnet fsi DuplicateTagFinder.fsx "/Users/me/Documents/duplicate-finder-settings.json" "/Users/me/Downloads/Music/library.json"
 ```
 
-If any duplicates are found, they will be listed in groups. Otherwise, nothing is listed. (I will improve this later.)
+If any files that appear to be duplicates are found, they will be listed in groups. If you see false positives, you can add the artist and/or title to the exclusions in your settings to hide them.
