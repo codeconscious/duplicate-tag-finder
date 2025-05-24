@@ -1,7 +1,7 @@
 ﻿let commandMap =
     [
-        ("cache", AudioTagTools.Cacher.start)
-        ("find-duplicates", AudioTagTools.DuplicateFinder.start)
+        "update-cache", AudioTagTools.Cacher.start
+        "find-duplicates", AudioTagTools.DuplicateFinder.start
     ]
     |> Map.ofList
 
@@ -10,7 +10,7 @@ let main args =
     let watch = Startwatch.Library.Watch()
 
     match args.Length with
-    | l when l < 1 ->
+    | l when l = 0 ->
         printfn "You must pass in a supported command."
         1
     | _ ->
@@ -32,4 +32,3 @@ let main args =
             | None ->
                 printfn $"Invalid command \"{command}\". You must pass in a supported command."
                 1
-

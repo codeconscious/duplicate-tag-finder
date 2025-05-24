@@ -32,8 +32,8 @@ module ArgValidation =
     open Errors
 
     let validate (args: string array) : Result<DirectoryInfo * FileInfo, Error> =
-        if args.Length = 3 // Index 0 is the name of the script itself.
-        then Ok (DirectoryInfo args[1], FileInfo args[2])
+        if args.Length = 2
+        then Ok (DirectoryInfo args[0], FileInfo args[1])
         else Error InvalidArgCount
 
 module Utilities =

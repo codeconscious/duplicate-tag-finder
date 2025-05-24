@@ -54,9 +54,9 @@ module ArgValidation =
     open Errors
 
     let validate (args: 'a array) : Result<'a * 'a, Error> =
-        if args.Length <> 3 // Index 0 is the name of the script itself.
-        then Error InvalidArgCount
-        else Ok (args[1], args[2])
+        if args.Length = 2
+        then Ok (args[0], args[1])
+        else Error InvalidArgCount
 
 module Settings =
     open Errors
