@@ -43,10 +43,10 @@ let filter (settings: SettingsRoot) (allTags: TagCollection) : FileTags array =
         let isExcluded (exclusion: SettingsProvider.Exclusion) =
             match exclusion.Artist, exclusion.Title with
             | Some a, Some t ->
-                anyContain [file.AlbumArtists; file.Artists] a &&
+                anyContains [file.AlbumArtists; file.Artists] a &&
                 file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
             | Some a, None ->
-                anyContain [file.AlbumArtists; file.Artists] a
+                anyContains [file.AlbumArtists; file.Artists] a
             | None, Some t ->
                 file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
             | _ -> false

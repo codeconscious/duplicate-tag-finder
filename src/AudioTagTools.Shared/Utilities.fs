@@ -28,7 +28,7 @@ let removeSubstrings (substrings: string array) (text: string) : string =
         text
         substrings
 
-let anyContain (collections: (string seq) seq) (target: string) : bool =
+let anyContains (collections: string seq seq) (target: string) : bool =
     collections
     |> Seq.concat
     |> Seq.exists (fun text -> StringComparer.InvariantCultureIgnoreCase.Equals(text, target))
