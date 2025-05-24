@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AudioTagTools.Main", "AudioTagTools.Main\AudioTagTools.Main.fsproj", "{49298256-CEB5-4061-9890-37F03AA6AB82}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AudioTagTools.Cacher", "AudioTagTools.Cacher\AudioTagTools.Cacher.fsproj", "{CC569162-EED4-4DD4-8AE4-FBABDE463AE4}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AudioTagTools.DuplicateFinder", "AudioTagTools.DuplicateFinder\AudioTagTools.DuplicateFinder.fsproj", "{CE829F3C-5FE8-45CE-A8D2-509A182AD04D}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AudioTagTools.Shared", "AudioTagTools.Shared\AudioTagTools.Shared.fsproj", "{6DC45392-D259-4AA4-8B77-7E5B381B39DB}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{49298256-CEB5-4061-9890-37F03AA6AB82}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{49298256-CEB5-4061-9890-37F03AA6AB82}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{49298256-CEB5-4061-9890-37F03AA6AB82}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{49298256-CEB5-4061-9890-37F03AA6AB82}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CC569162-EED4-4DD4-8AE4-FBABDE463AE4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CC569162-EED4-4DD4-8AE4-FBABDE463AE4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CC569162-EED4-4DD4-8AE4-FBABDE463AE4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CC569162-EED4-4DD4-8AE4-FBABDE463AE4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE829F3C-5FE8-45CE-A8D2-509A182AD04D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE829F3C-5FE8-45CE-A8D2-509A182AD04D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE829F3C-5FE8-45CE-A8D2-509A182AD04D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE829F3C-5FE8-45CE-A8D2-509A182AD04D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6DC45392-D259-4AA4-8B77-7E5B381B39DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6DC45392-D259-4AA4-8B77-7E5B381B39DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6DC45392-D259-4AA4-8B77-7E5B381B39DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6DC45392-D259-4AA4-8B77-7E5B381B39DB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

@@ -1,12 +1,11 @@
-#r "nuget: FsToolkit.ErrorHandling"
-#r "nuget: FSharp.Data"
-#r "nuget: CodeConscious.Startwatch, 1.0.0"
+﻿module AudioTagTools.DuplicateFinder
 
 open System
 open System.Globalization
 open System.IO
 open FSharp.Data
 open FsToolkit.ErrorHandling
+open Shared
 
 module Errors =
     type Error =
@@ -16,17 +15,12 @@ module Errors =
         | SettingsParseError of string
         | TagParseError of string
 
-    let message: Error -> string = function
+    let message = function
         | InvalidArgCount -> "Invalid arguments. Pass in two JSON filename paths: (1) your settings file and (2) your cached tag data."
         | FileMissing fileName -> $"The file \"{fileName}\" was not found."
         | IoError msg -> $"I/O failure: {msg}"
         | SettingsParseError msg -> $"Unable to parse the settings file: {msg}"
         | TagParseError msg -> $"Unable to parse the tag file: {msg}"
-
-module Operators =
-    let (>>=) result func = Result.bind func result
-    let (<!>) result func = Result.map func result
-    let (<.>) result func = Result.tee func result
 
 module Utilities =
     let formatNumber (i: int) =
@@ -212,9 +206,9 @@ open IO
 open Tags
 open Settings
 
-let run () =
+let run (args: string array) =
     result {
-        let! settingsFile, cachedTagFile = validate fsi.CommandLineArgs
+        let! settingsFile, cachedTagFile = validate args
 
         let! settings =
             settingsFile
@@ -230,16 +224,10 @@ let run () =
             <!> filter settings
             <.> printFilteredCount
             <!> findDuplicates settings
-            |> Result.iter printResults
+            <&> printResults
     }
 
-let watch = Startwatch.Library.Watch()
-
-match run () with
-| Ok x ->
-    printfn $"Done in {watch.ElapsedFriendly}."
-    0
-| Error e ->
-    printfn "%s" (message e)
-    printfn $"Failed after {watch.ElapsedFriendly}."
-    1
+let start args =
+    match run args with
+    | Ok _ -> Ok "Finished searching successfully!"
+    | Error e -> Error (message e)
