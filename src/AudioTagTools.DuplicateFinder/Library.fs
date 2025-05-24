@@ -22,21 +22,6 @@ module Errors =
         | SettingsParseError msg -> $"Unable to parse the settings file: {msg}"
         | TagParseError msg -> $"Unable to parse the tag file: {msg}"
 
-module Utilities =
-    let formatNumber (i: int) =
-        i.ToString("N0", CultureInfo.InvariantCulture) // Sample: 1,000
-
-    let removeSubstrings (substrings: string array) (text: string) : string =
-        Array.fold
-            (fun acc x -> acc.Replace(x, String.Empty))
-            text
-            substrings
-
-    let anyContain (collections: (string seq) seq) (target: string) : bool =
-        collections
-        |> Seq.concat
-        |> Seq.exists (fun text -> StringComparer.InvariantCultureIgnoreCase.Equals(text, target))
-
 module IO =
     open Errors
     open Operators

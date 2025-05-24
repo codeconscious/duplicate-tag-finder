@@ -6,6 +6,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <Compile Include="Errors.fs"/>
+        <Compile Include="IO.fs" />
+        <Compile Include="ArgValidation.fs"/>
+        <Compile Include="Tags.fs" />
         <Compile Include="Library.fs"/>
     </ItemGroup>
 
