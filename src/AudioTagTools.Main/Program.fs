@@ -2,7 +2,7 @@
 
 let commandMap =
     [
-        "update-cache", AudioTagTools.Cacher.start
+        "cache-tags", AudioTagTools.Cacher.start
         "find-duplicates", AudioTagTools.DuplicateFinder.start
     ]
     |> Map.ofList
