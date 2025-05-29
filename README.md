@@ -1,35 +1,38 @@
 # Audio Tag Tools
 
-This small command line application can do two task:
-1. Cache the audio metadata tags in supported audio files within a specified directory to a file on your computer
-2. Parse those cached tags and reports likely duplicates, based on the provided settings
+This small command line application can do two tasks:
+1. Cache metadata tags in supported audio files within a directory to a local library file
+2. Parse that tag library and report likely duplicate files, excluding any specified exceptions
 
-I mainly created it to practice with F# [JSON type providers](https://fsprojects.github.io/FSharp.Data/library/JsonProvider.html), but they do resolve a small pain point for me as well.
+I originally created this tool to practice with F# [JSON type providers](https://fsprojects.github.io/FSharp.Data/library/JsonProvider.html), but it resolved a small pain point for me as well.
 
 # Requirements
 
 - [.NET 9 runtime](https://dotnet.microsoft.com/en-us/download/dotnet/9.0)
-- JSON settings file (duplicate-finder only)
+- JSON settings file (only for the duplicate search) — plus comfort manually editing such JSON files
 
 # Running
 
+Ensure you are in the `AudioTagTools.Main` directory in your terminal.
+
 ## Caching tags
 
-Pass `update-cache` with two additional arguments:
+Pass `cache-tags` with two additional arguments:
 1. The path of the directory containing your audio files
-2. The path of the file that contains (or will contain, if it does not exist yet) your cached audio tags
+2. The path of the library file that contains (or will contain, if it does not exist yet) your cached audio tags
 
-Run the script like this:
+To start, use the `cache-tags` command like this:
 
 ```sh
-dotnet run -- update-cache "/Users/me/Documents/Audio" "/Users/me/Documents/Audio/tagCache.json"
+dotnet run -- cache-tags ~/Documents/Audio ~/Documents/Audio/tagLibrary.json
 ```
 
-If the specified tag file already exists, it will automatically be backed up in the same directory before a new one is created.
+> [!TIP]
+> The `--` is necessary to indicate that the command and arguments are for this program and not for `dotnet`.
 
-## Finding duplicates
+If a library file already exists at the specified path, a backup copy will automatically be created in the same directory.
 
-First, you must have a settings JSON file that contains the cached tag data to search through, and it must in this format:
+The file will be in this JSON format:
 
 ```json
 [
@@ -55,16 +58,21 @@ First, you must have a settings JSON file that contains the cached tag data to s
 ]
 ```
 
-(This is the same format that the `--cache-tags` option of [my AudioTagger utility](https://github.com/codeconscious/audiotagger) outputs. The advantage of this version is that will comparing tag data with file dates and only update out-of-date tag information, making the operation considerably faster, particularly when your files are on an slow external drive, etc.)
+> [!NOTE]
+> This is the same format that the `--cache-tags` option of [my AudioTagger utility](https://github.com/codeconscious/audiotagger) outputs. The advantage of using this tool instead is that it compares tag data against files' last-modified dates and only updates out-of-date tag information, making the operation considerably faster, particularly when your audio files are on a slow external drive, etc.
 
-Second, you must have a settings file containing items for exclusion prepared as well. I have provided a sample below.
+
+## Finding duplicates
+
+First, you must already have a tag library file containing your cached tag data. See the section above if you don't have one yet.
+
+Second, you must have a settings file containing exceptions—i.e., artists, track titles, and strings that you wish to exclude from the search. Actual entries are optional, but the file must be exist in the specified format. I have provided a sample you can use below.
 
 <details>
-  <summary>Click to expand!</summary>
+  <summary>Click to expand the sample...</summary>
 
 ```json
 {
-  "cachedTagFile": "YOUR_FULL_PATH_HERE.json",
   "exclusions": [
     {
       "artist": "SAMPLE_ARTIST_NAME",
@@ -141,10 +149,10 @@ Second, you must have a settings file containing items for exclusion prepared as
 ```
 </details>
 
-Pass `find-duplicates` along with (1) the settings file path and (2) the cached-tag file path (in that order) to the script like this:
+To start, use the `find-duplicates` command like this:
 
 ```sh
-dotnet run -- find-duplicates "/Users/me/Documents/duplicate-finder-settings.json" "/Users/me/Downloads/Music/library.json"
+dotnet run -- find-duplicates ~/Documents/duplicate-finder-settings.json ~/Downloads/Music/tagLibrary.json
 ```
 
-If any files that appear to be duplicates are found, they will be listed in groups. If you see false positives, you can add the artist and/or title to the exclusions in your settings to hide them.
+If any potential duplicates are found, they will be listed, grouped by artist. If you see false positives (i.e., tracks that were detected as duplicates, but are actually not), you can add entries to the exclusions in your settings to ignore them in the future.
