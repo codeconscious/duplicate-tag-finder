@@ -6,9 +6,6 @@ open System.Text.Encodings.Web
 open System.Text.Unicode
 open System.Globalization
 
-let formatWithCommas (i: int) =
-    i.ToString("N0", CultureInfo.InvariantCulture)
-
 let serializeToJson items : Result<string, string> =
     try
         let serializerOptions = JsonSerializerOptions()
@@ -19,7 +16,7 @@ let serializeToJson items : Result<string, string> =
     with
     | ex -> Error ex.Message
 
-let formatNumber (i: int) =
+let formatNumber (i: int) : string =
     i.ToString("N0", CultureInfo.InvariantCulture) // Sample: 1,000
 
 let removeSubstrings (substrings: string array) (text: string) : string =

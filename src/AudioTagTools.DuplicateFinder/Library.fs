@@ -10,7 +10,7 @@ open Tags
 open Settings
 open FsToolkit.ErrorHandling
 
-let run (args: string array) =
+let run (args: string array) : Result<unit, Error> =
     result {
         let! settingsFile, cachedTagFile = validate args
 

@@ -12,7 +12,7 @@ let readfile fileName : Result<string, Error> =
     | Ok x -> Ok x
     | Error msg -> Error (IoError msg.Message)
 
-let getFileInfos (dirPath: DirectoryInfo) =
+let getFileInfos (dirPath: DirectoryInfo) : Result<FileInfo seq, Error> =
     let isSupportedAudioFile (fileInfo: FileInfo) =
         [".mp3"; ".m4a"; ".mp4"; ".ogg"; ".flac"]
         |> List.contains fileInfo.Extension
@@ -27,21 +27,21 @@ let getFileInfos (dirPath: DirectoryInfo) =
 let readFileTags (filePath: string) : TaggedFile =
     TagLib.File.Create filePath
 
-let writeFile (fileName: string) (content: string) =
+let writeFile (fileName: string) (content: string) : Result<unit, Error> =
     try
         File.WriteAllText(fileName, content)
         |> Ok
     with
     | e -> Error (WriteFileError e.Message)
 
-let generateBackUpFilePath (cachedTagFile: FileInfo) =
+let generateBackUpFilePath (cachedTagFile: FileInfo) : string =
     let baseName = Path.GetFileNameWithoutExtension cachedTagFile.Name
     let timestamp = DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss"
     let extension = cachedTagFile.Extension // Includes the initial period.
     let fileName = sprintf "%s-%s%s" baseName timestamp extension
     Path.Combine(cachedTagFile.DirectoryName, fileName)
 
-let copyToBackupFile (cachedTagFile: FileInfo) =
+let copyToBackupFile (cachedTagFile: FileInfo) : Result<FileInfo option, Error> =
     let printConfirmation (backupFile: FileInfo) =
         printfn "Backed up previous tag file to \"%s\"." backupFile.Name
         backupFile

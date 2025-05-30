@@ -5,7 +5,5 @@ open Errors
 
 let validate (args: string array) : Result<FileInfo * FileInfo, Error> =
     match args with
-    | [| a; b |] -> Ok (FileInfo a, FileInfo b)
+    | [| x; y |] -> Ok (FileInfo x, FileInfo y)
     | _ -> Error InvalidArgCount
-
-

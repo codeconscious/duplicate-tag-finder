@@ -146,7 +146,7 @@ let compareAndUpdateTagData
     fileInfos
     |> Seq.map (fun fileInfo -> updateTags cachedTags fileInfo)
 
-let reportResults (results: CheckResultWithFileTags seq) =
+let reportResults (results: CheckResultWithFileTags seq) : CheckResultWithFileTags seq =
     let initialCounts = {| Added = 0; Updated = 0; Unchanged = 0 |}
 
     let totals =
@@ -158,14 +158,18 @@ let reportResults (results: CheckResultWithFileTags seq) =
             | Unchanged -> {| acc with Unchanged = acc.Unchanged + 1 |})
 
     printfn "Results:"
-    printfn "• New:       %s" (formatWithCommas totals.Added)
-    printfn "• Updated:   %s" (formatWithCommas totals.Updated)
-    printfn "• Unchanged: %s" (formatWithCommas totals.Unchanged)
-    printfn "• Total:     %s" (formatWithCommas (Seq.length results))
+    printfn "• New:       %s" (formatNumber totals.Added)
+    printfn "• Updated:   %s" (formatNumber totals.Updated)
+    printfn "• Unchanged: %s" (formatNumber totals.Unchanged)
+    printfn "• Total:     %s" (formatNumber (Seq.length results))
 
     results
 
-let generateNewJson (cachedTagMap: FileNameWithCachedTags) (fileInfos: FileInfo seq) : Result<string, Error> =
+let generateNewJson
+    (cachedTagMap: FileNameWithCachedTags)
+    (fileInfos: FileInfo seq)
+    : Result<string, Error>
+    =
     fileInfos
     |> compareAndUpdateTagData cachedTagMap
     |> reportResults
