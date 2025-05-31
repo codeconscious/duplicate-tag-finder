@@ -62,7 +62,7 @@ let parseCachedTagData json : Result<CachedTagRoot array, Error> =
 let audioFilePath (tags: CachedTagRoot) : string =
     Path.Combine [| tags.DirectoryName; tags.FileNameOnly |]
 
-let createCachedTagMap (cachedTagFile: FileInfo) : Result<Map<string, CachedTagRoot>, Error> =
+let createCachedTagMap (cachedTagFile: FileInfo) : Result<FileNameWithCachedTags, Error> =
     if cachedTagFile.Exists
     then
         cachedTagFile.FullName
