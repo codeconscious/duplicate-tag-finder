@@ -1,10 +1,9 @@
 ﻿module AudioTagTools.DuplicateFinder
 
 open System
-open Shared
+open Operators
 open Errors
 open ArgValidation
-open Operators
 open IO
 open Tags
 open Settings

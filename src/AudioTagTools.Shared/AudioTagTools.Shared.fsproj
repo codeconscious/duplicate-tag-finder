@@ -8,7 +8,6 @@
     <ItemGroup>
         <Compile Include="Utilities.fs"/>
         <Compile Include="Operators.fs" />
-        <Compile Include="Library.fs"/>
     </ItemGroup>
 
     <ItemGroup>
