@@ -6,7 +6,6 @@ open FSharp.Data
 open Errors
 open Operators
 open Utilities
-open AudioTagTools.Shared.Operators
 open FsToolkit.ErrorHandling
 
 type NewTags =
