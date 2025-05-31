@@ -106,7 +106,7 @@ let compareAndUpdateTagData
                                |> Array.map (fun p -> p.Normalize())
                 AlbumArtists = if currentTags.Tag.AlbumArtists = null
                                then [| String.Empty |]
-                               else currentTags.Tag.AlbumArtists |> Array.map (fun p -> p.Normalize())
+                               else currentTags.Tag.AlbumArtists |> Array.map _.Normalize()
                 Album = if currentTags.Tag.Album = null
                         then String.Empty
                         else currentTags.Tag.Album.Normalize()
