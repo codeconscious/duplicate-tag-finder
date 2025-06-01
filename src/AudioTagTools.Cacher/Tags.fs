@@ -8,7 +8,7 @@ open Operators
 open Utilities
 open FsToolkit.ErrorHandling
 
-type NewTags =
+type FileTagsToWrite =
     {
         FileNameOnly: string
         DirectoryName: string
@@ -23,10 +23,10 @@ type NewTags =
         LastWriteTime: DateTimeOffset
     }
 
-type CheckResult =
+type ComparisonResult =
     | Unchanged
-    | Updated
-    | New
+    | OutOfDate // The file tags are newer than the library's.
+    | NotPresent // Tags for the specified file don't exist in the tag library.
 
 [<Literal>]
 let private tagSample = """
@@ -46,43 +46,43 @@ let private tagSample = """
   }
 ]"""
 
-type CachedTagProvider = JsonProvider<tagSample>
-type CachedTagRoot = CachedTagProvider.Root
-type FileNameWithCachedTags = Map<string, CachedTagRoot>
-type CheckResultWithFileTags = CheckResult * NewTags
+type TagLibraryProvider = JsonProvider<tagSample>
+type TagLibraryMap = Map<string, TagLibraryProvider.Root>
+type ComparisonResultWithNewTags = ComparisonResult * FileTagsToWrite
 
-let parseCachedTagData json : Result<CachedTagRoot array, Error> =
+let parseTagLibrary json : Result<TagLibraryProvider.Root array, Error> =
     try
         json
-        |> CachedTagProvider.Parse
+        |> TagLibraryProvider.Parse
         |> Ok
     with
     | e -> Error (ParseError e.Message)
 
-let audioFilePath (tags: CachedTagRoot) : string =
-    Path.Combine [| tags.DirectoryName; tags.FileNameOnly |]
+let audioFilePath (fileTags: TagLibraryProvider.Root) : string =
+    Path.Combine [| fileTags.DirectoryName; fileTags.FileNameOnly |]
 
-let createCachedTagMap (cachedTagFile: FileInfo) : Result<FileNameWithCachedTags, Error> =
-    if cachedTagFile.Exists
+let createTagLibraryMap (tagLibraryFile: FileInfo) : Result<TagLibraryMap, Error> =
+    if tagLibraryFile.Exists
     then
-        cachedTagFile.FullName
+        tagLibraryFile.FullName
         |> readfile
-        >>= parseCachedTagData
+        >>= parseTagLibrary
         <!> Array.map (fun tags -> audioFilePath tags, tags)
         <!> Map.ofArray
     else
         Ok Map.empty
 
 let compareAndUpdateTagData
-    (cachedTags: FileNameWithCachedTags)
+    (tagLibraryMap: TagLibraryMap)
     (fileInfos: FileInfo seq)
-    : CheckResultWithFileTags seq
+    : ComparisonResultWithNewTags seq
     =
     let createNewTagData (fileInfo: FileInfo) =
-        let currentTags = readFileTags fileInfo.FullName
+        let fileTags = readFileTags fileInfo.FullName
 
-        if currentTags.Tag = null
+        if fileTags.Tag = null
         then
+            // Create an empty entry.
             {
                 FileNameOnly = fileInfo.Name
                 DirectoryName = fileInfo.DirectoryName
@@ -97,80 +97,81 @@ let compareAndUpdateTagData
                 LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
             }
         else
+            // Copy the latest tags from the file itself.
             {
                 FileNameOnly = fileInfo.Name
                 DirectoryName = fileInfo.DirectoryName
-                Artists = if currentTags.Tag.Performers = null
+                Artists = if fileTags.Tag.Performers = null
                           then [| String.Empty |]
-                          else currentTags.Tag.Performers
+                          else fileTags.Tag.Performers
                                |> Array.map (fun p -> p.Normalize())
-                AlbumArtists = if currentTags.Tag.AlbumArtists = null
+                AlbumArtists = if fileTags.Tag.AlbumArtists = null
                                then [| String.Empty |]
-                               else currentTags.Tag.AlbumArtists |> Array.map _.Normalize()
-                Album = if currentTags.Tag.Album = null
+                               else fileTags.Tag.AlbumArtists |> Array.map _.Normalize()
+                Album = if fileTags.Tag.Album = null
                         then String.Empty
-                        else currentTags.Tag.Album.Normalize()
-                TrackNo = currentTags.Tag.Track
-                Title = currentTags.Tag.Title
-                Year = currentTags.Tag.Year
-                Genres = currentTags.Tag.Genres
-                Duration = currentTags.Properties.Duration
+                        else fileTags.Tag.Album.Normalize()
+                TrackNo = fileTags.Tag.Track
+                Title = fileTags.Tag.Title
+                Year = fileTags.Tag.Year
+                Genres = fileTags.Tag.Genres
+                Duration = fileTags.Properties.Duration
                 LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
             }
 
-    let useExistingTagData (cachedTags: CachedTagRoot) =
+    let copyDataFromTagLibrary (tagLibraryTags: TagLibraryProvider.Root) =
         {
-            FileNameOnly = cachedTags.FileNameOnly
-            DirectoryName = cachedTags.DirectoryName
-            Artists = cachedTags.Artists
-            AlbumArtists = cachedTags.AlbumArtists
-            Album = cachedTags.Album
-            TrackNo = uint cachedTags.TrackNo
-            Title = cachedTags.Title
-            Year = uint cachedTags.Year
-            Genres = cachedTags.Genres
-            Duration = cachedTags.Duration
-            LastWriteTime = DateTimeOffset cachedTags.LastWriteTime.DateTime
+            FileNameOnly = tagLibraryTags.FileNameOnly
+            DirectoryName = tagLibraryTags.DirectoryName
+            Artists = tagLibraryTags.Artists
+            AlbumArtists = tagLibraryTags.AlbumArtists
+            Album = tagLibraryTags.Album
+            TrackNo = uint tagLibraryTags.TrackNo
+            Title = tagLibraryTags.Title
+            Year = uint tagLibraryTags.Year
+            Genres = tagLibraryTags.Genres
+            Duration = tagLibraryTags.Duration
+            LastWriteTime = DateTimeOffset tagLibraryTags.LastWriteTime.DateTime
         }
 
-    let updateTags (cachedTags: FileNameWithCachedTags) (fileInfo: FileInfo) : CheckResultWithFileTags =
-        if Map.containsKey fileInfo.FullName cachedTags
+    let updateTags (tagLibraryMap: TagLibraryMap) (audioFile: FileInfo) : ComparisonResultWithNewTags =
+        if Map.containsKey audioFile.FullName tagLibraryMap
         then
-            let fileCachedTags = Map.find fileInfo.FullName cachedTags
-            if fileCachedTags.LastWriteTime.DateTime < fileInfo.LastWriteTime
-            then Updated, (createNewTagData fileInfo)
-            else Unchanged, (useExistingTagData fileCachedTags)
-        else New, (createNewTagData fileInfo)
+            let libraryTags = Map.find audioFile.FullName tagLibraryMap
+            if libraryTags.LastWriteTime.DateTime < audioFile.LastWriteTime
+            then OutOfDate, (createNewTagData audioFile)
+            else Unchanged, (copyDataFromTagLibrary libraryTags)
+        else NotPresent, (createNewTagData audioFile)
 
     fileInfos
-    |> Seq.map (fun fileInfo -> updateTags cachedTags fileInfo)
+    |> Seq.map (updateTags tagLibraryMap)
 
-let reportResults (results: CheckResultWithFileTags seq) : CheckResultWithFileTags seq =
-    let initialCounts = {| Added = 0; Updated = 0; Unchanged = 0 |}
+let reportResults (results: ComparisonResultWithNewTags seq) : ComparisonResultWithNewTags seq =
+    let initialCounts = {| NotPresent = 0; OutOfDate = 0; Unchanged = 0 |}
 
     let totals =
         (initialCounts, results |> Seq.map fst)
         ||> Seq.fold (fun acc result ->
             match result with
-            | New -> {| acc with Added = acc.Added + 1 |}
-            | Updated -> {| acc with Updated = acc.Updated + 1 |}
+            | NotPresent -> {| acc with NotPresent = acc.NotPresent + 1 |}
+            | OutOfDate -> {| acc with OutOfDate = acc.OutOfDate + 1 |}
             | Unchanged -> {| acc with Unchanged = acc.Unchanged + 1 |})
 
     printfn "Results:"
-    printfn "• New:       %s" (formatNumber totals.Added)
-    printfn "• Updated:   %s" (formatNumber totals.Updated)
+    printfn "• New:       %s" (formatNumber totals.NotPresent)
+    printfn "• Updated:   %s" (formatNumber totals.OutOfDate)
     printfn "• Unchanged: %s" (formatNumber totals.Unchanged)
     printfn "• Total:     %s" (formatNumber (Seq.length results))
 
     results
 
 let generateNewJson
-    (cachedTagMap: FileNameWithCachedTags)
+    (tagLibraryMap: TagLibraryMap)
     (fileInfos: FileInfo seq)
     : Result<string, Error>
     =
     fileInfos
-    |> compareAndUpdateTagData cachedTagMap
+    |> compareAndUpdateTagData tagLibraryMap
     |> reportResults
     |> Seq.map snd
     |> serializeToJson

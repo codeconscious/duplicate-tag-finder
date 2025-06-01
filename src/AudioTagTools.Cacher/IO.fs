@@ -7,8 +7,8 @@ open Utilities
 
 type TaggedFile = TagLib.File
 
-let readfile fileName : Result<string, Error> =
-    match readAllText fileName with
+let readfile filePath : Result<string, Error> =
+    match readAllText filePath with
     | Ok x -> Ok x
     | Error msg -> Error (IoError msg.Message)
 
@@ -25,33 +25,33 @@ let getFileInfos (dirPath: DirectoryInfo) : Result<FileInfo seq, Error> =
     | e -> Error (IoError e.Message)
 
 let readFileTags (filePath: string) : TaggedFile =
-    TagLib.File.Create filePath
+    TaggedFile.Create filePath
 
-let writeFile (fileName: string) (content: string) : Result<unit, Error> =
+let writeFile (filePath: string) (content: string) : Result<unit, Error> =
     try
-        File.WriteAllText(fileName, content)
+        File.WriteAllText(filePath, content)
         |> Ok
     with
     | e -> Error (WriteFileError e.Message)
 
-let generateBackUpFilePath (cachedTagFile: FileInfo) : string =
-    let baseName = Path.GetFileNameWithoutExtension cachedTagFile.Name
+let generateBackUpFilePath (tagLibraryFile: FileInfo) : string =
+    let baseName = Path.GetFileNameWithoutExtension tagLibraryFile.Name
     let timestamp = DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss"
-    let extension = cachedTagFile.Extension // Includes the initial period.
+    let extension = tagLibraryFile.Extension // Includes the initial period.
     let fileName = sprintf "%s-%s%s" baseName timestamp extension
-    Path.Combine(cachedTagFile.DirectoryName, fileName)
+    Path.Combine(tagLibraryFile.DirectoryName, fileName)
 
-let copyToBackupFile (cachedTagFile: FileInfo) : Result<FileInfo option, Error> =
+let copyToBackupFile (tagLibraryFile: FileInfo) : Result<FileInfo option, Error> =
     let printConfirmation (backupFile: FileInfo) =
         printfn "Backed up previous tag file to \"%s\"." backupFile.Name
         backupFile
 
-    if cachedTagFile.Exists
+    if tagLibraryFile.Exists
     then
         try
-            cachedTagFile
+            tagLibraryFile
             |> generateBackUpFilePath
-            |> cachedTagFile.CopyTo
+            |> tagLibraryFile.CopyTo
             |> printConfirmation
             |> Some
             |> Ok

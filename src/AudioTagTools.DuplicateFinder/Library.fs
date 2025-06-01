@@ -11,7 +11,7 @@ open FsToolkit.ErrorHandling
 
 let run (args: string array) : Result<unit, Error> =
     result {
-        let! settingsFile, cachedTagFile = validate args
+        let! settingsFile, tagLibraryFile = validate args
 
         let! settings =
             settingsFile
@@ -20,7 +20,7 @@ let run (args: string array) : Result<unit, Error> =
             <.> printSummary
 
         return
-            cachedTagFile
+            tagLibraryFile
             |> readFile
             >>= parseToTags
             <.> printTotalCount
@@ -30,7 +30,7 @@ let run (args: string array) : Result<unit, Error> =
             <&> printResults
     }
 
-let start args =
+let start args : Result<string, string> =
     match run args with
     | Ok _ -> Ok "Finished searching successfully!"
     | Error e -> Error (message e)

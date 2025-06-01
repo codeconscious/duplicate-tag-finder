@@ -4,9 +4,9 @@ open System.IO
 open Errors
 open Operators
 
-let readFile (fileName: FileInfo) : Result<string, Error> =
+let readFile (fileInfo: FileInfo) : Result<string, Error> =
     try
-        fileName.FullName
+        fileInfo.FullName
         |> File.ReadAllText
         |> Ok
     with

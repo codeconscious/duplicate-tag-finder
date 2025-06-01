@@ -4,17 +4,18 @@ open System
 open Errors
 open IO
 open Tags
+open ArgValidation
 open FsToolkit.ErrorHandling
 
 let run (args: string array) : Result<unit, Error> =
     result {
-        let! mediaDir, tagCacheFile = ArgValidation.validate args
+        let! mediaDir, tagLibraryFile = validate args
         let! fileInfos = getFileInfos mediaDir
-        let! cachedTagMap = createCachedTagMap tagCacheFile
-        let! newJson = generateNewJson cachedTagMap fileInfos
+        let! tagLibraryMap = createTagLibraryMap tagLibraryFile
+        let! newJson = generateNewJson tagLibraryMap fileInfos
 
-        let! _ = copyToBackupFile tagCacheFile
-        do! writeFile tagCacheFile.FullName newJson
+        let! _ = copyToBackupFile tagLibraryFile
+        do! writeFile tagLibraryFile.FullName newJson
     }
 
 let start (args: string array) : Result<string, string> =
