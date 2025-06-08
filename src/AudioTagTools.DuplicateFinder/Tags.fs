@@ -4,43 +4,16 @@ open Errors
 open Utilities
 open Settings
 open System
-open FSharp.Data
 open Operators
+open TagLibraryIo
 
-[<Literal>]
-let private tagSample = """
-[
-  {
-    "FileName": "text",
-    "DirectoryName": "text",
-    "Artists": ["text"],
-    "AlbumArtists": ["text"],
-    "Album": "text",
-    "TrackNo": 0,
-    "Title": "text",
-    "Year": 0,
-    "Genres": ["text"],
-    "Duration": "00:00:00",
-    "LastWriteTime": "2023-09-13T13:49:44+09:00"
-  }
-]"""
-
-type TagJsonProvider = JsonProvider<tagSample>
-type FileTags = TagJsonProvider.Root
-type TagCollection = FileTags array
-type FilteredTagCollection = FileTags array
-
-let parseToTags (json: string) : Result<TagCollection, Error> =
-    try
-        json
-        |> TagJsonProvider.Parse
-        |> Ok
-    with
-    | e -> Error (TagParseError e.Message)
+let parseToTags json =
+    parseToTags json
+    |> Result.mapError (fun ex -> TagParseError ex.Message)
 
 let filter (settings: SettingsRoot) (allTags: TagCollection) : FileTags array =
-    let excludeFile (settings: SettingsRoot) (file: FileTags) =
-        let isExcluded (exclusion: SettingsProvider.Exclusion) =
+    let excludeFile (settings: SettingsRoot) (file: FileTags) : bool =
+        let isExcluded (exclusion: SettingsProvider.Exclusion) : bool =
             match exclusion.Artist, exclusion.Title with
             | Some a, Some t ->
                 anyContains [file.AlbumArtists; file.Artists] a &&
@@ -51,9 +24,11 @@ let filter (settings: SettingsRoot) (allTags: TagCollection) : FileTags array =
                 file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
             | _ -> false
 
-        settings.Exclusions |> Array.exists isExcluded
+        settings.Exclusions
+        |> Array.exists isExcluded
 
-    allTags |> Array.filter (not << excludeFile settings)
+    allTags
+    |> Array.filter (not << excludeFile settings)
 
 let findDuplicates
     (settings: SettingsRoot)
