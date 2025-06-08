@@ -7,7 +7,7 @@ open Tags
 open ArgValidation
 open FsToolkit.ErrorHandling
 
-let run (args: string array) : Result<unit, Error> =
+let private run (args: string array) : Result<unit, Error> =
     result {
         let! mediaDir, tagLibraryFile = validate args
         let! fileInfos = getFileInfos mediaDir
