@@ -6,18 +6,23 @@ open Errors
 open Exporting
 open ArgValidation
 open IO
+open TagLibrary
+open AudioTagTools.Shared.IO
 open FsToolkit.ErrorHandling
 
 let private run (args: string array) : Result<unit, Error> =
     result {
         let! tagLibraryFile, genreFile = validate args
 
-        return!
+        let! output =
             tagLibraryFile
-            |> readFile
-            >>= parseToTags
-            <!> processFiles
-            >>= writeFile genreFile.FullName
+            |> IO.readFile
+            >>= IO.parseToTags
+            <.> fun ts -> printfn $"Parsed tags for {ts.Length} files from the tag library."
+            <!> getArtistsWithGenres
+
+        let! _ = copyToBackupFile genreFile |> Result.mapError (fun x -> IoError x.Message)
+        return! IO.writeFile genreFile.FullName output
     }
 
 let start args : Result<string, string> =

@@ -6,6 +6,7 @@ open IO
 open Tags
 open ArgValidation
 open FsToolkit.ErrorHandling
+open AudioTagTools.Shared.IO
 
 let private run (args: string array) : Result<unit, Error> =
     result {
@@ -14,8 +15,8 @@ let private run (args: string array) : Result<unit, Error> =
         let! tagLibraryMap = createTagLibraryMap tagLibraryFile
         let! newJson = generateNewJson tagLibraryMap fileInfos
 
-        let! _ = copyToBackupFile tagLibraryFile
-        do! writeFile tagLibraryFile.FullName newJson
+        let! _ = copyToBackupFile tagLibraryFile |> Result.mapError (fun x -> IoError x.Message)
+        do! writeFile tagLibraryFile.FullName newJson |> Result.mapError (fun x -> IoError x.Message)
     }
 
 let start (args: string array) : Result<string, string> =

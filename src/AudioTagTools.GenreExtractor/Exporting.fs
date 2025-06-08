@@ -2,7 +2,7 @@ module Exporting
 
 open System
 open Errors
-open TagLibraryIo
+open TagLibrary
 
 let parseToTags json =
     parseToTags json
@@ -25,7 +25,7 @@ let mostCommon (items: seq<string>) : string =
     |> Option.map fst
     |> Option.defaultValue String.Empty
 
-let processFiles (filesTagCollection: FileTagCollection) =
+let getArtistsWithGenres (filesTagCollection: FileTagCollection) =
     let separator = "＼"
 
     let allGenres (fileTags: FileTags array) : string array =

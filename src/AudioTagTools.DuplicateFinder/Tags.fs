@@ -5,7 +5,7 @@ open Utilities
 open Settings
 open System
 open Operators
-open TagLibraryIo
+open TagLibrary
 
 let parseToTags json =
     parseToTags json
