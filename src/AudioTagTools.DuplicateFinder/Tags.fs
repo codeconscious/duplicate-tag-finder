@@ -11,7 +11,7 @@ let parseToTags json =
     parseToTags json
     |> Result.mapError (fun ex -> TagParseError ex.Message)
 
-let filter (settings: SettingsRoot) (allTags: TagCollection) : FileTags array =
+let filter (settings: SettingsRoot) (allTags: FileTagCollection) : FileTags array =
     let excludeFile (settings: SettingsRoot) (file: FileTags) : bool =
         let isExcluded (exclusion: SettingsProvider.Exclusion) : bool =
             match exclusion.Artist, exclusion.Title with
@@ -51,7 +51,7 @@ let findDuplicates
         $"{artists}{title}")
     |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
 
-let printTotalCount (tags: TagCollection) =
+let printTotalCount (tags: FileTagCollection) =
     printfn $"Total file count:    %s{formatNumber tags.Length}"
 
 let printFilteredCount (tags: FilteredTagCollection) =

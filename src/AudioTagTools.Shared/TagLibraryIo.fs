@@ -24,7 +24,7 @@ let private tagSample = """
 
 type TagJsonProvider = JsonProvider<tagSample>
 type FileTags = TagJsonProvider.Root
-type TagCollection = FileTags array
+type FileTagCollection = FileTags array
 type FilteredTagCollection = FileTags array
 
 let readFile (fileInfo: FileInfo) : Result<string, exn> =
@@ -34,11 +34,15 @@ let readFile (fileInfo: FileInfo) : Result<string, exn> =
         |> Ok
     with ex -> Error ex
 
-let parseToTags (json: string) : Result<TagCollection, exn> =
+let parseToTags (json: string) : Result<FileTagCollection, exn> =
     try
         json
         |> TagJsonProvider.Parse
         |> Ok
     with ex -> Error ex
 
-
+let writeFile (filePath: string) (text: string) : Result<unit, exn> =
+    try
+        File.WriteAllText(filePath, text)
+        |> Ok
+    with ex -> Error ex

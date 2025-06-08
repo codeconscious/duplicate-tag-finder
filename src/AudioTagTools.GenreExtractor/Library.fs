@@ -12,12 +12,12 @@ let private run (args: string array) : Result<unit, Error> =
     result {
         let! tagLibraryFile, genreFile = validate args
 
-        return
+        return!
             tagLibraryFile
             |> readFile
             >>= parseToTags
-            <!> _.Length
-            <&> printfn "Found %d items!"
+            <!> processFiles
+            >>= writeFile genreFile.FullName
     }
 
 let start args : Result<string, string> =

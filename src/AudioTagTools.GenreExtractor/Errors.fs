@@ -2,7 +2,7 @@ module Errors
 
 type Error =
     | InvalidArgCount
-    | IoError of string
+    | IoError of string // TODO: Split into read and write errors.
     | TagParseError of string
 
 let message = function
