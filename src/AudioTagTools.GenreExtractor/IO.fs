@@ -13,6 +13,10 @@ let parseToTags (json: string) : Result<FileTagCollection, Error> =
     parseToTags json
     |> Result.mapError (fun ex -> TagParseError ex.Message)
 
-let writeFile (filePath: string) (text: string) : Result<unit, Error> =
-    writeFile filePath text
+let writeText (filePath: string) (text: string) : Result<unit, Error> =
+    writeTextToFile filePath text
+    |> Result.mapError (fun ex -> IoError ex.Message)
+
+let writeLines (filePath: string) (lines: string array) : Result<unit, Error> =
+    writeLinesToFile filePath lines
     |> Result.mapError (fun ex -> IoError ex.Message)

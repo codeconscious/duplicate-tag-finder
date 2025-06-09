@@ -16,7 +16,7 @@ let private run (args: string array) : Result<unit, Error> =
         let! newJson = generateNewJson tagLibraryMap fileInfos
 
         let! _ = copyToBackupFile tagLibraryFile |> Result.mapError (fun x -> IoError x.Message)
-        do! writeFile tagLibraryFile.FullName newJson |> Result.mapError (fun x -> IoError x.Message)
+        do! writeTextToFile tagLibraryFile.FullName newJson |> Result.mapError (fun x -> IoError x.Message)
     }
 
 let start (args: string array) : Result<string, string> =

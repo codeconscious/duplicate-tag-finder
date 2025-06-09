@@ -1,12 +1,10 @@
 ﻿module AudioTagTools.GenreExtractor
 
-open System
 open Operators
 open Errors
 open Exporting
 open ArgValidation
-open IO
-open TagLibrary
+open Utilities
 open AudioTagTools.Shared.IO
 open FsToolkit.ErrorHandling
 
@@ -18,11 +16,12 @@ let private run (args: string array) : Result<unit, Error> =
             tagLibraryFile
             |> IO.readFile
             >>= IO.parseToTags
-            <.> fun ts -> printfn $"Parsed tags for {ts.Length} files from the tag library."
+            <.> fun ts -> printfn $"Parsed tags for {formatInt ts.Length} files from the tag library."
             <!> getArtistsWithGenres
+            <.> fun x -> printfn $"Prepared {formatInt x.Length} artist-genre pairs."
 
         let! _ = copyToBackupFile genreFile |> Result.mapError (fun x -> IoError x.Message)
-        return! IO.writeFile genreFile.FullName output
+        return! IO.writeLines genreFile.FullName output
     }
 
 let start args : Result<string, string> =

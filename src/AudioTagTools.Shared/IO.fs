@@ -10,8 +10,12 @@ let readFile (fileInfo: FileInfo) : Result<string, exn> =
         |> Ok
     with ex -> Error ex
 
-let writeFile (filePath: string) (text: string) : Result<unit, exn> =
+let writeTextToFile (filePath: string) (text: string) : Result<unit, exn> =
     try Ok (File.WriteAllText(filePath, text))
+    with ex -> Error ex
+
+let writeLinesToFile (filePath: string) (lines: string array) : Result<unit, exn> =
+    try Ok (File.WriteAllLines(filePath, lines))
     with ex -> Error ex
 
 let copyToBackupFile (fileInfo: FileInfo) : Result<FileInfo option, exn> =
@@ -38,4 +42,3 @@ let copyToBackupFile (fileInfo: FileInfo) : Result<FileInfo option, exn> =
         with
         | ex -> Error ex
     else Ok None
-
