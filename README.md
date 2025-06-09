@@ -1,10 +1,11 @@
 # Audio Tag Tools
 
-This small command line application can do two tasks:
-1. Cache metadata tags in supported audio files within a directory to a local library file
-2. Parse that tag library and report likely duplicate files, excluding any specified exceptions
+This small command line application can do three tasks:
+1. Cache metadata tags from audio files
+2. Report likely duplicate files based on their tags
+3. Export a list of artists with their most common genres
 
-I originally created this tool to practice with F# [JSON type providers](https://fsprojects.github.io/FSharp.Data/library/JsonProvider.html), but it resolved a small pain point for me as well.
+I originally created this tool to practice with F# [JSON type providers](https://fsprojects.github.io/FSharp.Data/library/JsonProvider.html), but it resolves a couple of small pain points for me as well.
 
 # Requirements
 
@@ -17,11 +18,14 @@ Ensure you are in the `AudioTagTools.Main` directory in your terminal.
 
 ## Caching tags
 
-Pass `cache-tags` with two additional arguments:
+Creates a tag library, a JSON file containing the text tag data from the audio files in a specified directory. 
+
+Pass `cache-tags` with two arguments:
+
 1. The path of the directory containing your audio files
 2. The path of the library file that contains (or will contain, if it does not exist yet) your cached audio tags
 
-To start, use the `cache-tags` command like this:
+Sample:
 
 ```sh
 dotnet run -- cache-tags ~/Documents/Audio ~/Documents/Audio/tagLibrary.json
@@ -156,3 +160,20 @@ dotnet run -- find-duplicates ~/Documents/duplicate-finder-settings.json ~/Downl
 ```
 
 If any potential duplicates are found, they will be listed, grouped by artist. If you see false positives (i.e., tracks that were detected as duplicates, but are actually not), you can add entries to the exclusions in your settings to ignore them in the future.
+
+## Export artist genres
+
+This command creates a text file containing a list of artists with the genre that they are most associated with in your tag library.
+
+To use it, pass `export-genres` with two arguments:
+
+1. The path of your library file
+2. The path of the text file that contains (or will contain, if it does not exist yet) your artists with corresponding genres
+
+Sample:
+
+```sh
+dotnet run -- export-genres ~/Downloads/Music/tagLibrary.json ~/Downloads/Music/genres.txt
+```
+
+If a genres file already exists at that path, a backup will be auto-saved.
