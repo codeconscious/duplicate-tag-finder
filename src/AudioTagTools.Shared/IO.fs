@@ -23,7 +23,7 @@ let copyToBackupFile (fileInfo: FileInfo) : Result<FileInfo option, exn> =
         let baseName = Path.GetFileNameWithoutExtension tagLibraryFile.Name
         let timestamp = DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss"
         let extension = tagLibraryFile.Extension // Includes the initial period.
-        let fileName = sprintf "%s-%s%s" baseName timestamp extension
+        let fileName = $"%s{baseName}.%s{timestamp}_backup%s{extension}"
         Path.Combine(tagLibraryFile.DirectoryName, fileName)
 
     let printConfirmation (backupFile: FileInfo) =
