@@ -43,4 +43,3 @@ let getArtistsWithGenres (filesTagCollection: FileTagCollection) =
     |> Array.filter (fun (_, g) -> g <> String.Empty)
     |> Array.sortBy fst
     |> Array.map (fun (a, g) -> $"{a}{separator}{g}")
-    // |> String.concat Environment.NewLine

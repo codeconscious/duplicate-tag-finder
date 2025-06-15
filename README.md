@@ -176,4 +176,4 @@ Sample:
 dotnet run -- export-genres ~/Downloads/Music/tagLibrary.json ~/Downloads/Music/genres.txt
 ```
 
-If a genres file already exists at that path, a backup will be auto-saved.
+If a genres file already exists at that path, a backup will be auto-created.

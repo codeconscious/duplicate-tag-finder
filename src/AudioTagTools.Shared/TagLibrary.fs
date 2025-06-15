@@ -29,8 +29,5 @@ type FileTagCollection = FileTags array
 type FilteredTagCollection = FileTags array
 
 let parseToTags (json: string) : Result<FileTagCollection, exn> =
-    try
-        json
-        |> TagJsonProvider.Parse
-        |> Ok
+    try Ok (TagJsonProvider.Parse json)
     with ex -> Error ex

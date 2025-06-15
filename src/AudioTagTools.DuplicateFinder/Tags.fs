@@ -63,7 +63,7 @@ let printResults (groupedTracks: (string * FilteredTagCollection) array) =
     else
         groupedTracks
         |> Array.iteri (fun i (_, groupTracks) ->
-            // Print the artist(s) using the group's first file's artist(s).
+            // Print the artist from this group's first file's artists.
             groupTracks
             |> Array.head
             |> _.Artists
