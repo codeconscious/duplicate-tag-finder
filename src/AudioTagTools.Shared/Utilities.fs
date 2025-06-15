@@ -6,6 +6,10 @@ open System.Text.Encodings.Web
 open System.Text.Unicode
 open System.Globalization
 
+/// Format an int to a comma-separator numeric string. Example: 1000 -> "1,000".
+let formatInt (i: int) : string =
+    i.ToString("#,##0", CultureInfo.InvariantCulture)
+
 /// Serialize items to formatted JSON, returning a Result.
 /// If an exception is thrown during the underlying operation,
 /// the Error only includes its message.

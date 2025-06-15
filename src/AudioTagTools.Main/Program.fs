@@ -1,9 +1,10 @@
 ﻿let commandMap =
     [ "cache-tags", AudioTagTools.Cacher.start
-      "find-duplicates", AudioTagTools.DuplicateFinder.start ]
+      "find-duplicates", AudioTagTools.DuplicateFinder.start
+      "export-genres", AudioTagTools.GenreExtractor.start ]
     |> Map.ofList
 
-let commandExplanation =
+let commandInstructions =
     commandMap
     |> Map.keys
     |> String.concat "\" or \""
@@ -19,7 +20,7 @@ let main args : int =
 
     match args with
     | [| |] ->
-        printfn $"{commandExplanation}"
+        printfn $"{commandInstructions}"
         ExitCode.Failure
     | _ ->
         let command = args[0]
@@ -37,6 +38,6 @@ let main args : int =
                 printfn $"Failed after {watch.ElapsedFriendly}."
                 ExitCode.Failure
         | None ->
-            printfn $"Invalid command \"{command}\". {commandExplanation}"
+            printfn $"Invalid command \"{command}\". {commandInstructions}"
             ExitCode.Failure
     |> int
