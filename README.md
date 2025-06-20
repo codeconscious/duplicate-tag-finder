@@ -163,7 +163,7 @@ If any potential duplicates are found, they will be listed, grouped by artist. I
 
 ## Export artist genres
 
-This command creates a text file containing a list of artists with the genre that they are most associated with in your tag library.
+Creates a text file containing a list of artists with the genre that they are most associated with in your tag library.
 
 To use it, pass `export-genres` with two arguments:
 
@@ -176,4 +176,4 @@ Sample:
 dotnet run -- export-genres ~/Downloads/Music/tagLibrary.json ~/Downloads/Music/genres.txt
 ```
 
-If a genres file already exists at that path, a backup will be auto-created.
+If a genres file already exists at that path, a backup will be created automatically.
