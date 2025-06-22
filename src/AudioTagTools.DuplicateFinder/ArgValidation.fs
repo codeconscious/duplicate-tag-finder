@@ -1,7 +1,7 @@
 module ArgValidation
 
-open System.IO
 open Errors
+open System.IO
 
 let validate (args: string array) : Result<FileInfo * FileInfo, Error> =
     match args with

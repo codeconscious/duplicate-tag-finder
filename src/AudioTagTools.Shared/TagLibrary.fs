@@ -1,9 +1,6 @@
 module TagLibrary
 
-open System
-open System.IO
 open FSharp.Data
-open Operators
 
 [<Literal>]
 let private tagSample = """
@@ -28,6 +25,6 @@ type FileTags = TagJsonProvider.Root
 type FileTagCollection = FileTags array
 type FilteredTagCollection = FileTags array
 
-let parseToTags (json: string) : Result<FileTagCollection, exn> =
+let parseToTags (json: string) : Result<FileTagCollection, string> =
     try Ok (TagJsonProvider.Parse json)
-    with ex -> Error ex
+    with ex -> Error ex.Message

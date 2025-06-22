@@ -156,7 +156,7 @@ Second, you must have a settings file containing exceptions—i.e., artists, tra
 To start, use the `find-duplicates` command like this:
 
 ```sh
-dotnet run -- find-duplicates ~/Documents/duplicate-finder-settings.json ~/Downloads/Music/tagLibrary.json
+dotnet run -- find-duplicates ~/Documents/settings.json ~/Downloads/Music/tagLibrary.json
 ```
 
 If any potential duplicates are found, they will be listed, grouped by artist. If you see false positives (i.e., tracks that were detected as duplicates, but are actually not), you can add entries to the exclusions in your settings to ignore them in the future.

@@ -1,12 +1,7 @@
 module Exporting
 
 open System
-open Errors
 open TagLibrary
-
-let parseToTags json =
-    parseToTags json
-    |> Result.mapError (fun ex -> TagParseError ex.Message)
 
 let private mainArtist (fileTags: FileTags) =
     match fileTags with
@@ -34,7 +29,7 @@ let private allGenres (fileTags: FileTags array) : string array =
 let private mostCommonGenres = allGenres >> mostCommon
 
 let getArtistsWithGenres (filesTagCollection: FileTagCollection) =
-    let separator = "＼"
+    let separator = "＼" // Should be a character unlikely to appear in files' tags.
 
     filesTagCollection
     |> Array.groupBy mainArtist

@@ -17,11 +17,11 @@ let private run (args: string array) : Result<unit, Error> =
 
         let! _ =
             copyToBackupFile tagLibraryFile
-            |> Result.mapError (fun x -> WriteFileError x.Message)
+            |> Result.mapError WriteFileError
 
         do!
             writeTextToFile tagLibraryFile.FullName newJson
-            |> Result.mapError (fun x -> WriteFileError x.Message)
+            |> Result.mapError WriteFileError
     }
 
 let start (args: string array) : Result<string, string> =

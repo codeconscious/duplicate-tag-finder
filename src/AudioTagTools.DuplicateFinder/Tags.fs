@@ -9,19 +9,19 @@ open TagLibrary
 
 let parseToTags json =
     parseToTags json
-    |> Result.mapError (fun ex -> TagParseError ex.Message)
+    |> Result.mapError TagParseError
 
 let filter (settings: SettingsRoot) (allTags: FileTagCollection) : FileTags array =
-    let excludeFile (settings: SettingsRoot) (file: FileTags) : bool =
+    let excludeFile (settings: SettingsRoot) (fileTags: FileTags) : bool =
         let isExcluded (exclusion: SettingsProvider.Exclusion) : bool =
             match exclusion.Artist, exclusion.Title with
             | Some a, Some t ->
-                anyContains [file.AlbumArtists; file.Artists] a &&
-                file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+                anyContains [fileTags.AlbumArtists; fileTags.Artists] a &&
+                fileTags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
             | Some a, None ->
-                anyContains [file.AlbumArtists; file.Artists] a
+                anyContains [fileTags.AlbumArtists; fileTags.Artists] a
             | None, Some t ->
-                file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+                fileTags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
             | _ -> false
 
         settings.Exclusions
