@@ -9,7 +9,7 @@ type TaggedFile = TagLib.File
 let readfile filePath : Result<string, Error> =
     match readAllText filePath with
     | Ok x -> Ok x
-    | Error msg -> Error (IoError msg.Message)
+    | Error msg -> Error (ReadFileError msg.Message)
 
 let getFileInfos (dirPath: DirectoryInfo) : Result<FileInfo seq, Error> =
     let isSupportedAudioFile (fileInfo: FileInfo) =
@@ -21,10 +21,10 @@ let getFileInfos (dirPath: DirectoryInfo) : Result<FileInfo seq, Error> =
         |> Seq.filter isSupportedAudioFile
         |> Ok
     with
-    | e -> Error (IoError e.Message)
+    | e -> Error (GeneralIoError e.Message)
 
 let readFileTags (filePath: string) : TaggedFile =
-    TaggedFile.Create filePath
+    TaggedFile.Create filePath // TODO: Enclose in try/with.
 
 let writeFile (filePath: string) (content: string) : Result<unit, Error> =
     try
