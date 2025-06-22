@@ -33,7 +33,7 @@ let filter (settings: SettingsRoot) (allTags: FileTagCollection) : FileTags arra
 let findDuplicates
     (settings: SettingsRoot)
     (tags: FilteredTagCollection)
-    : (string * FilteredTagCollection) array
+    : Map<string, FilteredTagCollection>
     =
     tags
     |> Array.filter (fun track ->
@@ -50,6 +50,7 @@ let findDuplicates
             |> removeSubstrings settings.TitleReplacements
         $"{artists}{title}")
     |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
+    |> Map.ofArray
 
 let printTotalCount (tags: FileTagCollection) =
     printfn $"Total file count:    %s{formatNumber tags.Length}"
@@ -57,12 +58,14 @@ let printTotalCount (tags: FileTagCollection) =
 let printFilteredCount (tags: FilteredTagCollection) =
     printfn $"Filtered file count: %s{formatNumber tags.Length}"
 
-let printResults (groupedTracks: (string * FilteredTagCollection) array) =
-    if groupedTracks.Length = 0
+let printResults (groupedTracks: Map<string, FilteredTagCollection>) =
+    if groupedTracks.IsEmpty
     then printfn "No duplicates found."
     else
         groupedTracks
-        |> Array.iteri (fun i (_, groupTracks) ->
+        |> Map.values
+        |> Array.ofSeq
+        |> Array.iteri (fun i groupTracks ->
             // Print the artist from this group's first file's artists.
             groupTracks
             |> Array.head
