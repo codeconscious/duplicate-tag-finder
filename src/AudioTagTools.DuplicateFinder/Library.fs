@@ -19,7 +19,7 @@ let private run (args: string array) : Result<unit, Error> =
             >>= parseToSettings
             <.> printSummary
 
-        return
+        return!
             tagLibraryFile
             |> readFile
             >>= parseToTags
@@ -27,7 +27,7 @@ let private run (args: string array) : Result<unit, Error> =
             <!> filter settings
             <.> printFilteredCount
             <!> findDuplicates settings
-            <&> printResults
+            <!> printResults
     }
 
 let start args : Result<string, string> =
