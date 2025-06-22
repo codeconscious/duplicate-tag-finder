@@ -27,8 +27,7 @@ let private run (args: string array) : Result<unit, Error> =
             <!> filter settings
             <.> printFilteredCount
             <!> findDuplicates settings
-            <.> printResults
-            <!> ignore
+            <!> printResults
     }
 
 let start args : Result<string, string> =
