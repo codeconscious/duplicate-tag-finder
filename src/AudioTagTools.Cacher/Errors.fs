@@ -5,7 +5,7 @@ type Error =
     | MediaDirectoryMissing of string
     | ReadFileError of string
     | WriteFileError of string
-    | IoError of string
+    | GeneralIoError of string
     | ParseError of string
     | JsonSerializationError of string
 
@@ -14,6 +14,6 @@ let message = function
     | MediaDirectoryMissing msg -> $"Directory \"{msg}\" was not found."
     | ReadFileError msg -> $"Read failure: {msg}"
     | WriteFileError msg -> $"Write failure: {msg}"
-    | IoError msg -> $"I/O failure: {msg}"
+    | GeneralIoError msg -> $"I/O failure: {msg}"
     | ParseError msg -> $"Parse error: {msg}"
     | JsonSerializationError msg -> $"JSON serialization error: {msg}"

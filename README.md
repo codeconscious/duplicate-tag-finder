@@ -156,14 +156,14 @@ Second, you must have a settings file containing exceptions—i.e., artists, tra
 To start, use the `find-duplicates` command like this:
 
 ```sh
-dotnet run -- find-duplicates ~/Documents/duplicate-finder-settings.json ~/Downloads/Music/tagLibrary.json
+dotnet run -- find-duplicates ~/Documents/settings.json ~/Downloads/Music/tagLibrary.json
 ```
 
 If any potential duplicates are found, they will be listed, grouped by artist. If you see false positives (i.e., tracks that were detected as duplicates, but are actually not), you can add entries to the exclusions in your settings to ignore them in the future.
 
 ## Export artist genres
 
-This command creates a text file containing a list of artists with the genre that they are most associated with in your tag library.
+Creates a text file containing a list of artists with the genre that they are most associated with in your tag library.
 
 To use it, pass `export-genres` with two arguments:
 
@@ -176,4 +176,4 @@ Sample:
 dotnet run -- export-genres ~/Downloads/Music/tagLibrary.json ~/Downloads/Music/genres.txt
 ```
 
-If a genres file already exists at that path, a backup will be auto-saved.
+If a genres file already exists at that path, a backup will be created automatically.

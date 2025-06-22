@@ -5,7 +5,7 @@ open Errors
 open Exporting
 open ArgValidation
 open Utilities
-open AudioTagTools.Shared.IO
+open Shared.IO
 open FsToolkit.ErrorHandling
 
 let private run (args: string array) : Result<unit, Error> =
@@ -16,15 +16,18 @@ let private run (args: string array) : Result<unit, Error> =
             tagLibraryFile
             |> IO.readFile
             >>= IO.parseToTags
-            <.> fun ts -> printfn $"Parsed tags for {formatInt ts.Length} files from the tag library."
+            <.> fun tags -> printfn $"Parsed tags for {formatInt tags.Length} files from the tag library."
             <!> getArtistsWithGenres
-            <.> fun x -> printfn $"Prepared {formatInt x.Length} artist-genre pairs."
+            <.> fun xs -> printfn $"Prepared {formatInt xs.Length} artist-genre pairs."
 
-        let! _ = copyToBackupFile genreFile |> Result.mapError (fun x -> IoError x.Message)
+        let! _ =
+            copyToBackupFile genreFile
+            |> Result.mapError IoWriteError
+
         return! IO.writeLines genreFile.FullName output
     }
 
 let start args : Result<string, string> =
     match run args with
-    | Ok _ -> Ok "Finished exporting genres successfully!"
+    | Ok () -> Ok "Finished exporting genres successfully!"
     | Error e -> Error (message e)
