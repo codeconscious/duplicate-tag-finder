@@ -6,15 +6,19 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Operators.fs" />
-        <Compile Include="Utilities.fs"/>
-        <Compile Include="IO.fs" />
-        <Compile Include="TagLibrary.fs" />
+        <Compile Include="Errors.fs" />
+        <Compile Include="IO.fs"/>
+        <Compile Include="ArgValidation.fs" />
+        <Compile Include="Exporting.fs" />
+        <Compile Include="Library.fs"/>
     </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="FSharp.Data" Version="6.6.0" />
-      <PackageReference Include="FsToolkit.ErrorHandling" Version="4.18.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\AudioTagTools.Shared\AudioTagTools.Shared.fsproj" />
     </ItemGroup>
 
 </Project>

@@ -9,7 +9,7 @@ open Tags
 open Settings
 open FsToolkit.ErrorHandling
 
-let run (args: string array) : Result<unit, Error> =
+let private run (args: string array) : Result<unit, Error> =
     result {
         let! settingsFile, tagLibraryFile = validate args
 

@@ -1,6 +1,5 @@
 module IO
 
-open System
 open System.IO
 open Errors
 open Utilities
@@ -10,7 +9,7 @@ type TaggedFile = TagLib.File
 let readfile filePath : Result<string, Error> =
     match readAllText filePath with
     | Ok x -> Ok x
-    | Error msg -> Error (IoError msg.Message)
+    | Error msg -> Error (ReadFileError msg.Message)
 
 let getFileInfos (dirPath: DirectoryInfo) : Result<FileInfo seq, Error> =
     let isSupportedAudioFile (fileInfo: FileInfo) =
@@ -22,10 +21,10 @@ let getFileInfos (dirPath: DirectoryInfo) : Result<FileInfo seq, Error> =
         |> Seq.filter isSupportedAudioFile
         |> Ok
     with
-    | e -> Error (IoError e.Message)
+    | e -> Error (GeneralIoError e.Message)
 
 let readFileTags (filePath: string) : TaggedFile =
-    TaggedFile.Create filePath
+    TaggedFile.Create filePath // TODO: Enclose in try/with.
 
 let writeFile (filePath: string) (content: string) : Result<unit, Error> =
     try
@@ -33,28 +32,3 @@ let writeFile (filePath: string) (content: string) : Result<unit, Error> =
         |> Ok
     with
     | e -> Error (WriteFileError e.Message)
-
-let generateBackUpFilePath (tagLibraryFile: FileInfo) : string =
-    let baseName = Path.GetFileNameWithoutExtension tagLibraryFile.Name
-    let timestamp = DateTimeOffset.Now.ToString "yyyyMMdd_HHmmss"
-    let extension = tagLibraryFile.Extension // Includes the initial period.
-    let fileName = sprintf "%s-%s%s" baseName timestamp extension
-    Path.Combine(tagLibraryFile.DirectoryName, fileName)
-
-let copyToBackupFile (tagLibraryFile: FileInfo) : Result<FileInfo option, Error> =
-    let printConfirmation (backupFile: FileInfo) =
-        printfn "Backed up previous tag file to \"%s\"." backupFile.Name
-        backupFile
-
-    if tagLibraryFile.Exists
-    then
-        try
-            tagLibraryFile
-            |> generateBackUpFilePath
-            |> tagLibraryFile.CopyTo
-            |> printConfirmation
-            |> Some
-            |> Ok
-        with
-        | e -> Error (IoError $"Could not create tag backup file: {e.Message}")
-    else Ok None

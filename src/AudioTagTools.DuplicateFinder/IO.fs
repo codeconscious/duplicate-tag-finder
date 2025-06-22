@@ -1,13 +1,9 @@
 module IO
 
-open System.IO
 open Errors
-open Operators
+open System.IO
+open AudioTagTools.Shared.IO
 
 let readFile (fileInfo: FileInfo) : Result<string, Error> =
-    try
-        fileInfo.FullName
-        |> File.ReadAllText
-        |> Ok
-    with
-    | ex -> Error (IoError ex.Message)
+    readFile fileInfo
+    |> Result.mapError ReadFileError

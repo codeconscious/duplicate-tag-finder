@@ -17,6 +17,7 @@
     <ItemGroup>
       <ProjectReference Include="..\AudioTagTools.Cacher\AudioTagTools.Cacher.fsproj" />
       <ProjectReference Include="..\AudioTagTools.DuplicateFinder\AudioTagTools.DuplicateFinder.fsproj" />
+      <ProjectReference Include="..\AudioTagTools.GenreExtractor\AudioTagTools.GenreExtractor.fsproj" />
     </ItemGroup>
 
 </Project>

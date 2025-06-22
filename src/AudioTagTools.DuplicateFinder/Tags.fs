@@ -4,56 +4,31 @@ open Errors
 open Utilities
 open Settings
 open System
-open FSharp.Data
 open Operators
+open TagLibrary
 
-[<Literal>]
-let private tagSample = """
-[
-  {
-    "FileName": "text",
-    "DirectoryName": "text",
-    "Artists": ["text"],
-    "AlbumArtists": ["text"],
-    "Album": "text",
-    "TrackNo": 0,
-    "Title": "text",
-    "Year": 0,
-    "Genres": ["text"],
-    "Duration": "00:00:00",
-    "LastWriteTime": "2023-09-13T13:49:44+09:00"
-  }
-]"""
+let parseToTags json =
+    parseToTags json
+    |> Result.mapError TagParseError
 
-type TagJsonProvider = JsonProvider<tagSample>
-type FileTags = TagJsonProvider.Root
-type TagCollection = FileTags array
-type FilteredTagCollection = FileTags array
-
-let parseToTags (json: string) : Result<TagCollection, Error> =
-    try
-        json
-        |> TagJsonProvider.Parse
-        |> Ok
-    with
-    | e -> Error (TagParseError e.Message)
-
-let filter (settings: SettingsRoot) (allTags: TagCollection) : FileTags array =
-    let excludeFile (settings: SettingsRoot) (file: FileTags) =
-        let isExcluded (exclusion: SettingsProvider.Exclusion) =
+let filter (settings: SettingsRoot) (allTags: FileTagCollection) : FileTags array =
+    let excludeFile (settings: SettingsRoot) (fileTags: FileTags) : bool =
+        let isExcluded (exclusion: SettingsProvider.Exclusion) : bool =
             match exclusion.Artist, exclusion.Title with
             | Some a, Some t ->
-                anyContains [file.AlbumArtists; file.Artists] a &&
-                file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+                anyContains [fileTags.AlbumArtists; fileTags.Artists] a &&
+                fileTags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
             | Some a, None ->
-                anyContains [file.AlbumArtists; file.Artists] a
+                anyContains [fileTags.AlbumArtists; fileTags.Artists] a
             | None, Some t ->
-                file.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
+                fileTags.Title.StartsWith(t, StringComparison.InvariantCultureIgnoreCase)
             | _ -> false
 
-        settings.Exclusions |> Array.exists isExcluded
+        settings.Exclusions
+        |> Array.exists isExcluded
 
-    allTags |> Array.filter (not << excludeFile settings)
+    allTags
+    |> Array.filter (not << excludeFile settings)
 
 let findDuplicates
     (settings: SettingsRoot)
@@ -76,7 +51,7 @@ let findDuplicates
         $"{artists}{title}")
     |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
 
-let printTotalCount (tags: TagCollection) =
+let printTotalCount (tags: FileTagCollection) =
     printfn $"Total file count:    %s{formatNumber tags.Length}"
 
 let printFilteredCount (tags: FilteredTagCollection) =
@@ -88,7 +63,7 @@ let printResults (groupedTracks: (string * FilteredTagCollection) array) =
     else
         groupedTracks
         |> Array.iteri (fun i (_, groupTracks) ->
-            // Print the artist(s) using the group's first file's artist(s).
+            // Print the artist from this group's first file's artists.
             groupTracks
             |> Array.head
             |> _.Artists
