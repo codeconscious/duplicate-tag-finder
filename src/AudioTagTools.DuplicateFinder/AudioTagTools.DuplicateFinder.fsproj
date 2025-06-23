@@ -7,8 +7,8 @@
 
     <ItemGroup>
         <Compile Include="Errors.fs" />
-        <Compile Include="IO.fs" />
         <Compile Include="Settings.fs" />
+        <Compile Include="IO.fs" />
         <Compile Include="Tags.fs" />
         <Compile Include="ArgValidation.fs" />
         <Compile Include="Library.fs"/>
