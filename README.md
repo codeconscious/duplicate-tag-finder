@@ -77,6 +77,11 @@ Second, you must have a settings file containing exceptions—i.e., artists, tra
 
 ```json
 {
+  "playlist": {
+    "saveDirectory": "/Users/me/Downloads/NewAudio",
+    "pathSearchFor": "/Users/me/Documents/Media/",
+    "pathReplaceWith": ""
+  },
   "exclusions": [
     {
       "artist": "SAMPLE_ARTIST_NAME",

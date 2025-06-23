@@ -6,6 +6,11 @@ open FSharp.Data
 [<Literal>]
 let settingsSample = """
 {
+    "playlist": {
+        "saveDirectory": "path",
+        "searchPath": "path",
+        "replacePath": "path"
+    },
     "exclusions": [
         {
             "artist": "artist"
