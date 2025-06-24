@@ -74,18 +74,18 @@ let printFilteredCount (tags: FilteredTagCollection) =
     printfn $"Filtered file count: %s{formatNumber tags.Length}"
 
 let printResults (groupedTracks: FileTags array array) =
+    let print i (groupTracks: FileTags array) =
+        // Print the joined artists from this group's first file.
+        groupTracks
+        |> Array.head
+        |> _.Artists
+        |> String.concat ", "
+        |> printfn "%d. %s" (i + 1) // Start at 1, not 0.
+
+        // Print each suspected duplicate track in the group.
+        groupTracks
+        |> Array.iter (fun x -> printfn $"""   • {x.Title}""")
+
     if Array.isEmpty groupedTracks
     then printfn "No duplicates found."
-    else
-        groupedTracks
-        |> Array.iteri (fun i groupTracks ->
-            // Print the joined artists from this group's first file.
-            groupTracks
-            |> Array.head
-            |> _.Artists
-            |> String.concat ", "
-            |> printfn "%d. %s" (i + 1) // Start at 1, not 0.
-
-            // Print each suspected duplicate track in the group.
-            groupTracks
-            |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
+    else groupedTracks |> Array.iteri print
