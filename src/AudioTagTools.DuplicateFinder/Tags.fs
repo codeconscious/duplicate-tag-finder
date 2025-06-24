@@ -30,20 +30,22 @@ let filter (settings: SettingsRoot) (allTags: FileTagCollection) : FileTags arra
     allTags
     |> Array.filter (not << excludeFile settings)
 
-let private hasAnyArtist (track: FileTags) =
-    track.Artists.Length > 0 || track.AlbumArtists.Length > 0
-
-let private hasTitle (track: FileTags) =
-    not <| String.IsNullOrWhiteSpace track.Title
-
 let private hasArtistOrTitle track =
+    let hasAnyArtist (track: FileTags) =
+        track.Artists.Length > 0 || track.AlbumArtists.Length > 0
+
+    let hasTitle (track: FileTags) =
+        not <| String.IsNullOrWhiteSpace track.Title
+
     hasAnyArtist track && hasTitle track
 
 let private groupName (settings: SettingsRoot) (track: FileTags) =
     // It appears JSON type providers do not import whitespace-only values. Whitespace should
     // always be ignored to increase the accuracy of duplicate checks, so they are added here.
     let removeSubstrings arr =
-        removeSubstrings (Array.append [| " "; "　" |] arr)
+        arr
+        |> Array.append [| " "; "　" |]
+        |> removeSubstrings
 
     let artists =
         match track with
@@ -62,8 +64,8 @@ let findDuplicates (settings: SettingsRoot) (tags: FilteredTagCollection) : File
     tags
     |> Array.filter hasArtistOrTitle
     |> Array.groupBy (groupName settings)
-    |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
     |> Array.map snd
+    |> Array.filter (fun groupedTracks -> groupedTracks.Length > 1)
 
 let printTotalCount (tags: FileTagCollection) =
     printfn $"Total file count:    %s{formatNumber tags.Length}"
@@ -77,13 +79,13 @@ let printResults (groupedTracks: FileTags array array) =
     else
         groupedTracks
         |> Array.iteri (fun i groupTracks ->
-            // Print the artist from this group's first file's artists.
+            // Print the joined artists from this group's first file.
             groupTracks
             |> Array.head
             |> _.Artists
-            |> fun x -> String.Join(", ", x)
-            |> printfn "%d. %s" (i + 1) // Start at 1.
+            |> String.concat ", "
+            |> printfn "%d. %s" (i + 1) // Start at 1, not 0.
 
-            // Print each possible-duplicate track in the group.
+            // Print each suspected duplicate track in the group.
             groupTracks
             |> Array.iter (fun x -> printfn $"""   • {x.Title}"""))
