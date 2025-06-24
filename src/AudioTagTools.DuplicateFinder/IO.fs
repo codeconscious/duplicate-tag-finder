@@ -23,7 +23,7 @@ let savePlaylist (settings: SettingsRoot) (tags: FileTags array array) : Result<
         let xy = Array.append x y
         String.Join("; ", xy)
 
-    let update (m: TagLibrary.FileTags) : unit =
+    let update (m: FileTags) : unit =
         let seconds = m.Duration.TotalSeconds
         let artist = combine m.AlbumArtists m.Artists
         let artistTitle = $"{artist} - {m.Title}"

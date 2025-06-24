@@ -40,8 +40,8 @@ let private hasArtistOrTitle track =
     hasAnyArtist track && hasTitle track
 
 let private groupName (settings: SettingsRoot) (track: FileTags) =
-    // It appears type providers do not import spaces. Spaces should
-    // always be removed for duplicate checks, so I add them here.
+    // It appears JSON type providers do not import whitespace-only values. Whitespace should
+    // always be ignored to increase the accuracy of duplicate checks, so they are added here.
     let removeSubstrings arr =
         removeSubstrings (Array.append [| " "; "　" |] arr)
 
@@ -51,9 +51,11 @@ let private groupName (settings: SettingsRoot) (track: FileTags) =
         | t -> t.Artists
         |> String.Concat
         |> removeSubstrings settings.ArtistReplacements
+
     let title =
         track.Title
         |> removeSubstrings settings.TitleReplacements
+
     $"{artists}{title}"
 
 let findDuplicates (settings: SettingsRoot) (tags: FilteredTagCollection) : FileTags array array =
