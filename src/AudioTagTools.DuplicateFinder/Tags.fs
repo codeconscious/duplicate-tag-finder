@@ -30,27 +30,40 @@ let filter (settings: SettingsRoot) (allTags: FileTagCollection) : FileTags arra
     allTags
     |> Array.filter (not << excludeFile settings)
 
-let findDuplicates
-    (settings: SettingsRoot)
-    (tags: FilteredTagCollection)
-    : Map<string, FilteredTagCollection>
-    =
+let private hasAnyArtist (track: FileTags) =
+    track.Artists.Length > 0 || track.AlbumArtists.Length > 0
+
+let private hasTitle (track: FileTags) =
+    not <| String.IsNullOrWhiteSpace track.Title
+
+let private hasArtistOrTitle track =
+    hasAnyArtist track && hasTitle track
+
+let private groupName (settings: SettingsRoot) (track: FileTags) =
+    // It appears JSON type providers do not import whitespace-only values. Whitespace should
+    // always be ignored to increase the accuracy of duplicate checks, so they are added here.
+    let removeSubstrings arr =
+        removeSubstrings (Array.append [| " "; "　" |] arr)
+
+    let artists =
+        match track with
+        | t when t.AlbumArtists.Length > 0 -> t.AlbumArtists
+        | t -> t.Artists
+        |> String.Concat
+        |> removeSubstrings settings.ArtistReplacements
+
+    let title =
+        track.Title
+        |> removeSubstrings settings.TitleReplacements
+
+    $"{artists}{title}"
+
+let findDuplicates (settings: SettingsRoot) (tags: FilteredTagCollection) : FileTags array array =
     tags
-    |> Array.filter (fun track ->
-        let hasArtists = track.Artists.Length > 0
-        let hasTitle = not <| String.IsNullOrWhiteSpace track.Title
-        hasArtists && hasTitle)
-    |> Array.groupBy (fun track ->
-        let artists =
-            track.Artists
-            |> String.Concat
-            |> removeSubstrings settings.ArtistReplacements
-        let title =
-            track.Title
-            |> removeSubstrings settings.TitleReplacements
-        $"{artists}{title}")
+    |> Array.filter hasArtistOrTitle
+    |> Array.groupBy (groupName settings)
     |> Array.filter (fun (_, groupedTracks) -> groupedTracks.Length > 1)
-    |> Map.ofArray
+    |> Array.map snd
 
 let printTotalCount (tags: FileTagCollection) =
     printfn $"Total file count:    %s{formatNumber tags.Length}"
@@ -58,13 +71,11 @@ let printTotalCount (tags: FileTagCollection) =
 let printFilteredCount (tags: FilteredTagCollection) =
     printfn $"Filtered file count: %s{formatNumber tags.Length}"
 
-let printResults (groupedTracks: Map<string, FilteredTagCollection>) =
-    if groupedTracks.IsEmpty
+let printResults (groupedTracks: FileTags array array) =
+    if Array.isEmpty groupedTracks
     then printfn "No duplicates found."
     else
         groupedTracks
-        |> Map.values
-        |> Array.ofSeq
         |> Array.iteri (fun i groupTracks ->
             // Print the artist from this group's first file's artists.
             groupTracks
