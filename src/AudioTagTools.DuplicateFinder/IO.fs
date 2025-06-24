@@ -1,22 +1,19 @@
 module IO
 
-open System
-open System.Text
 open Errors
 open Settings
-open System.IO
+open TagLibrary
 open AudioTagTools.Shared.IO
+open System
+open System.Text
+open System.IO
 open FsToolkit.ErrorHandling
 
 let readFile (fileInfo: FileInfo) : Result<string, Error> =
     readFile fileInfo
     |> Result.mapError ReadFileError
 
-let savePlaylist
-    (settings: SettingsRoot)
-    (tags: Map<string, TagLibrary.FilteredTagCollection>)
-    : Result<string, Error>
-    =
+let savePlaylist (settings: SettingsRoot) (tags: FileTags array array) : Result<string, Error> =
     let mutable contents = StringBuilder("#EXTM3U\n")
     let now = DateTime.Now.ToString("yyyyMMdd_HHmmss")
     let filename = $"Duplicates by AudioTagTools - {now}.m3u"
@@ -43,7 +40,7 @@ let savePlaylist
 
         contents.AppendLine updatedPath |> ignore
 
-    tags.Values
+    tags
     |> Seq.collect id
     |> Seq.iter update
 
