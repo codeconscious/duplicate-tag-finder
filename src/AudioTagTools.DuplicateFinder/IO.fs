@@ -31,10 +31,9 @@ let savePlaylist (settings: SettingsRoot) (tags: FileTags array array) : Result<
         contents.AppendLine extInf |> ignore
 
         let fullPath = Path.Combine(m.DirectoryName, m.FileNameOnly)
-        let searchFor, replaceWith = settings.Playlist.SearchPath, settings.Playlist.ReplacePath
 
         let updatedPath =
-            match searchFor, replaceWith with
+            match settings.Playlist.SearchPath, settings.Playlist.ReplacePath with
             | s, _ when String.IsNullOrEmpty s -> fullPath
             | s, r -> fullPath.Replace(s, r)
 
