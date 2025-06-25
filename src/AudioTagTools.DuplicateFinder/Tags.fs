@@ -91,9 +91,14 @@ let printResults (groupedTracks: FileTags array array) =
         |> String.concat ", "
         |> printfn "%d. %s" (i + 1) // Start at 1, not 0.
 
+        let artistText (track: FileTags) =
+            if Array.isEmpty track.Artists
+            then String.Empty
+            else $"""{String.Join(", ", track.Artists)}  /  """
+
         // Print each suspected duplicate track in the group.
         groupTracks
-        |> Array.iter (fun x -> printfn $"""   • {String.Join(", ", x.Artists)} / {x.Title}""")
+        |> Array.iter (fun x -> printfn $"""    • {artistText x}{x.Title}""")
 
     if Array.isEmpty groupedTracks
     then printfn "No duplicates found."
