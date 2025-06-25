@@ -41,8 +41,12 @@ let private hasArtistOrTitle track =
 
 let private mainArtists (track: FileTags) =
     match track with
-    | t when t.AlbumArtists.Length > 0 -> t.AlbumArtists
-    | t -> t.Artists
+    | t when t.AlbumArtists.Length > 0
+             && t.AlbumArtists[0] <> "Various Artists"
+             && t.AlbumArtists[0] <> "Various" ->
+        t.AlbumArtists
+    | t ->
+        t.Artists
 
 let private groupName (settings: SettingsRoot) (track: FileTags) =
     // It appears JSON type providers do not import whitespace-only values. Whitespace should
