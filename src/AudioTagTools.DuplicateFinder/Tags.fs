@@ -39,7 +39,7 @@ let private hasArtistOrTitle track =
 
     hasAnyArtist track && hasTitle track
 
-let private mainArtists (track: FileTags) =
+let private mainArtists (separator: string) (track: FileTags) =
     match track with
     | t when t.AlbumArtists.Length > 0
              && t.AlbumArtists[0] <> "Various Artists"
@@ -47,19 +47,19 @@ let private mainArtists (track: FileTags) =
         t.AlbumArtists
     | t ->
         t.Artists
+    |> String.concat separator
 
 let private groupName (settings: SettingsRoot) (track: FileTags) =
     // It appears JSON type providers do not import whitespace-only values. Whitespace should
     // always be ignored to increase the accuracy of duplicate checks, so they are added here.
     let removeSubstrings arr =
         arr
-        |> Array.append [| " "; "　" |]
+        |> Array.append [| " "; "　" |] // Single-byte and double-byte spaces.
         |> removeSubstrings
 
     let artists =
         track
-        |> mainArtists
-        |> String.Concat
+        |> mainArtists String.Empty
         |> removeSubstrings settings.ArtistReplacements
 
     let title =
@@ -83,13 +83,12 @@ let printFilteredCount (tags: FilteredTagCollection) =
     printfn $"Filtered file count: %s{formatNumber tags.Length}"
 
 let printResults (groupedTracks: FileTags array array) =
-    let print i (groupTracks: FileTags array) =
+    let print index (groupTracks: FileTags array) =
         // Print the joined artists from this group's first file.
         groupTracks
         |> Array.head
-        |> mainArtists
-        |> String.concat ", "
-        |> printfn "%d. %s" (i + 1) // Start at 1, not 0.
+        |> mainArtists ", "
+        |> printfn "%d. %s" (index + 1) // Start at 1, not 0.
 
         let artistText (track: FileTags) =
             if Array.isEmpty track.Artists

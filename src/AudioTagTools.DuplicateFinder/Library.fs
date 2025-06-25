@@ -29,7 +29,6 @@ let private run (args: string array) : Result<unit, Error> =
             <!> findDuplicates settings
             <.> printResults
             >>= savePlaylist settings
-            <!> fun x -> printfn $"Created playlist file \"{x}\"."
     }
 
 let start args : Result<string, string> =
