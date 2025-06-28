@@ -3,9 +3,10 @@ module Tags
 open Errors
 open Utilities
 open Settings
-open System
 open Operators
 open TagLibrary
+open System
+open System.Text
 
 let parseToTags json =
     parseToTags json
@@ -67,6 +68,8 @@ let private groupName (settings: SettingsRoot) (track: FileTags) =
         |> removeSubstrings settings.TitleReplacements
 
     $"{artists}{title}"
+        .Normalize(NormalizationForm.FormC)
+        .ToLowerInvariant()
 
 let findDuplicates (settings: SettingsRoot) (tags: FilteredTagCollection) : FileTags array array =
     tags
