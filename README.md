@@ -75,6 +75,8 @@ Second, you must have a settings file containing exceptions—i.e., artists, tra
 <details>
   <summary>Click to expand the sample...</summary>
 
+Note: Use `pathSearchFor` and `pathReplaceWith` if you wish to modify the base path of your media files in the playlist file—for example, if you wish the load the playlist on a different device where the files reside under a different path. Otherwise, they may be left blank. 
+
 ```json
 {
   "playlist": {
