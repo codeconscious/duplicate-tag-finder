@@ -38,7 +38,7 @@ let savePlaylist (settings: SettingsRoot) (tags: FileTags array array) : Result<
 
     tags
     |> Seq.collect id
-    |> Seq.fold appendFileEntry (StringBuilder("#EXTM3U\n"))
+    |> Seq.fold appendFileEntry (StringBuilder "#EXTM3U\n")
     |> _.ToString()
     |> writeTextToFile fullPath
     |> Result.tee (fun _ -> printfn $"Created playlist file \"{fullPath}\".")
