@@ -6,7 +6,7 @@ open FSharp.Data
 let private tagSample = """
 [
   {
-    "FileName": "text",
+    "FileNameOnly": "text",
     "DirectoryName": "text",
     "Artists": ["text"],
     "AlbumArtists": ["text"],

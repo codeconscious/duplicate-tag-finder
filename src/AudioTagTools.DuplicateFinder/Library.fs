@@ -27,7 +27,8 @@ let private run (args: string array) : Result<unit, Error> =
             <!> filter settings
             <.> printFilteredCount
             <!> findDuplicates settings
-            <!> printResults
+            <.> printResults
+            >>= savePlaylist settings
     }
 
 let start args : Result<string, string> =
