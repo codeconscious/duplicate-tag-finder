@@ -9,6 +9,8 @@ open Shared.IO
 open FsToolkit.ErrorHandling
 
 let private run (args: string array) : Result<unit, Error> =
+    printfn "Starting..."
+
     result {
         let! tagLibraryFile, genreFile = validate args
 

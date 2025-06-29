@@ -9,6 +9,8 @@ open FsToolkit.ErrorHandling
 open AudioTagTools.Shared.IO
 
 let private run (args: string array) : Result<unit, Error> =
+    printfn "Starting..."
+
     result {
         let! mediaDir, tagLibraryFile = validate args
         let! fileInfos = getFileInfos mediaDir
