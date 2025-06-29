@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AudioTagTools.Main", "AudioTagTools.Main\AudioTagTools.Main.fsproj", "{49298256-CEB5-4061-9890-37F03AA6AB82}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AudioTagTools.Console", "AudioTagTools.Console\AudioTagTools.Console.fsproj", "{49298256-CEB5-4061-9890-37F03AA6AB82}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AudioTagTools.Cacher", "AudioTagTools.Cacher\AudioTagTools.Cacher.fsproj", "{CC569162-EED4-4DD4-8AE4-FBABDE463AE4}"
 EndProject
