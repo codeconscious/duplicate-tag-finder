@@ -14,7 +14,7 @@ I originally created this tool to practice with F# [JSON type providers](https:/
 
 # Running
 
-Ensure you are in the `AudioTagTools.Main` directory in your terminal.
+Ensure you are in the `AudioTagTools.Console` directory in your terminal.
 
 ## Caching tags
 
