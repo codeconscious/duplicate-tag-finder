@@ -78,11 +78,7 @@ let compareAndUpdateTagData
     : ComparisonResultWithNewTags seq
     =
     let createNewTagData (fileInfo: FileInfo) =
-        let fileTags = readFileTags fileInfo.FullName
-
-        if fileTags.Tag = null
-        then
-            // Create an empty entry.
+        let newTags =
             {
                 FileNameOnly = fileInfo.Name
                 DirectoryName = fileInfo.DirectoryName
@@ -96,42 +92,50 @@ let compareAndUpdateTagData
                 Duration = TimeSpan.Zero
                 LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
             }
-        else
-            // Copy the latest tags from the file itself.
-            {
-                FileNameOnly = fileInfo.Name
-                DirectoryName = fileInfo.DirectoryName
-                Artists = if fileTags.Tag.Performers = null
-                          then [| String.Empty |]
-                          else fileTags.Tag.Performers
-                               |> Array.map (fun p -> p.Normalize())
-                AlbumArtists = if fileTags.Tag.AlbumArtists = null
-                               then [| String.Empty |]
-                               else fileTags.Tag.AlbumArtists |> Array.map _.Normalize()
-                Album = if fileTags.Tag.Album = null
-                        then String.Empty
-                        else fileTags.Tag.Album.Normalize()
-                TrackNo = fileTags.Tag.Track
-                Title = fileTags.Tag.Title
-                Year = fileTags.Tag.Year
-                Genres = fileTags.Tag.Genres
-                Duration = fileTags.Properties.Duration
-                LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
-            }
 
-    let copyDataFromTagLibrary (tagLibraryTags: TagLibraryProvider.Root) =
+        let fileTags = readFileTags fileInfo.FullName
+
+        match fileTags with
+        | Error _ -> newTags
+        | Ok fileTags ->
+            if fileTags.Tag = null
+            then newTags
+            else
+                // Copy the latest tags from the file itself.
+                {
+                    FileNameOnly = fileInfo.Name
+                    DirectoryName = fileInfo.DirectoryName
+                    Artists = if fileTags.Tag.Performers = null
+                              then [| String.Empty |]
+                              else fileTags.Tag.Performers
+                                   |> Array.map _.Normalize()
+                    AlbumArtists = if fileTags.Tag.AlbumArtists = null
+                                   then [| String.Empty |]
+                                   else fileTags.Tag.AlbumArtists |> Array.map _.Normalize()
+                    Album = if fileTags.Tag.Album = null
+                            then String.Empty
+                            else fileTags.Tag.Album.Normalize()
+                    TrackNo = fileTags.Tag.Track
+                    Title = fileTags.Tag.Title
+                    Year = fileTags.Tag.Year
+                    Genres = fileTags.Tag.Genres
+                    Duration = fileTags.Properties.Duration
+                    LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
+                }
+
+    let copyDataFromTagLibrary (libraryTags: TagLibraryProvider.Root) =
         {
-            FileNameOnly = tagLibraryTags.FileNameOnly
-            DirectoryName = tagLibraryTags.DirectoryName
-            Artists = tagLibraryTags.Artists
-            AlbumArtists = tagLibraryTags.AlbumArtists
-            Album = tagLibraryTags.Album
-            TrackNo = uint tagLibraryTags.TrackNo
-            Title = tagLibraryTags.Title
-            Year = uint tagLibraryTags.Year
-            Genres = tagLibraryTags.Genres
-            Duration = tagLibraryTags.Duration
-            LastWriteTime = DateTimeOffset tagLibraryTags.LastWriteTime.DateTime
+            FileNameOnly = libraryTags.FileNameOnly
+            DirectoryName = libraryTags.DirectoryName
+            Artists = libraryTags.Artists
+            AlbumArtists = libraryTags.AlbumArtists
+            Album = libraryTags.Album
+            TrackNo = uint libraryTags.TrackNo
+            Title = libraryTags.Title
+            Year = uint libraryTags.Year
+            Genres = libraryTags.Genres
+            Duration = libraryTags.Duration
+            LastWriteTime = DateTimeOffset libraryTags.LastWriteTime.DateTime
         }
 
     let updateTags (tagLibraryMap: TagLibraryMap) (audioFile: FileInfo) : ComparisonResultWithNewTags =

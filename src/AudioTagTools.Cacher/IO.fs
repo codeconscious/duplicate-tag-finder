@@ -23,12 +23,10 @@ let getFileInfos (dirPath: DirectoryInfo) : Result<FileInfo seq, Error> =
     with
     | e -> Error (GeneralIoError e.Message)
 
-let readFileTags (filePath: string) : TaggedFile =
-    TaggedFile.Create filePath // TODO: Enclose in try/with.
+let readFileTags (filePath: string) : Result<TaggedFile, Error> =
+    try Ok (TaggedFile.Create filePath)
+    with e -> Error (ParseError e.Message)
 
 let writeFile (filePath: string) (content: string) : Result<unit, Error> =
-    try
-        File.WriteAllText(filePath, content)
-        |> Ok
-    with
-    | e -> Error (WriteFileError e.Message)
+    try Ok (File.WriteAllText(filePath, content))
+    with e -> Error (WriteFileError e.Message)
