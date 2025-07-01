@@ -72,12 +72,25 @@ let createTagLibraryMap (tagLibraryFile: FileInfo) : Result<TagLibraryMap, Error
     else
         Ok Map.empty
 
-let compareAndUpdateTagData
-    (tagLibraryMap: TagLibraryMap)
-    (fileInfos: FileInfo seq)
+let compareAndUpdateTagData (tagLibraryMap: TagLibraryMap) (fileInfos: FileInfo seq)
     : ComparisonResultWithNewTags seq
     =
-    let createNewTagData (fileInfo: FileInfo) =
+    let copyFromLibrary (libraryTags: TagLibraryProvider.Root) =
+        {
+            FileNameOnly = libraryTags.FileNameOnly
+            DirectoryName = libraryTags.DirectoryName
+            Artists = libraryTags.Artists
+            AlbumArtists = libraryTags.AlbumArtists
+            Album = libraryTags.Album
+            TrackNo = uint libraryTags.TrackNo
+            Title = libraryTags.Title
+            Year = uint libraryTags.Year
+            Genres = libraryTags.Genres
+            Duration = libraryTags.Duration
+            LastWriteTime = DateTimeOffset libraryTags.LastWriteTime.DateTime
+        }
+
+    let createNew (fileInfo: FileInfo) : FileTagsToWrite =
         let blankTags =
             {
                 FileNameOnly = fileInfo.Name
@@ -93,7 +106,7 @@ let compareAndUpdateTagData
                 LastWriteTime = DateTimeOffset fileInfo.LastWriteTime
             }
 
-        let copyTagsFromFile (fileInfo: FileInfo) (fileTags: TaggedFile) =
+        let readFromFile (fileInfo: FileInfo) (fileTags: TaggedFile) =
             {
                 FileNameOnly = fileInfo.Name
                 DirectoryName = fileInfo.DirectoryName
@@ -115,31 +128,16 @@ let compareAndUpdateTagData
         | Ok fileTags ->
             if fileTags.Tag = null
             then blankTags
-            else copyTagsFromFile fileInfo fileTags
-
-    let copyDataFromTagLibrary (libraryTags: TagLibraryProvider.Root) =
-        {
-            FileNameOnly = libraryTags.FileNameOnly
-            DirectoryName = libraryTags.DirectoryName
-            Artists = libraryTags.Artists
-            AlbumArtists = libraryTags.AlbumArtists
-            Album = libraryTags.Album
-            TrackNo = uint libraryTags.TrackNo
-            Title = libraryTags.Title
-            Year = uint libraryTags.Year
-            Genres = libraryTags.Genres
-            Duration = libraryTags.Duration
-            LastWriteTime = DateTimeOffset libraryTags.LastWriteTime.DateTime
-        }
+            else readFromFile fileInfo fileTags
 
     let updateTags (tagLibraryMap: TagLibraryMap) (audioFile: FileInfo) : ComparisonResultWithNewTags =
         if Map.containsKey audioFile.FullName tagLibraryMap
         then
             let libraryTags = Map.find audioFile.FullName tagLibraryMap
             if libraryTags.LastWriteTime.DateTime < audioFile.LastWriteTime
-            then OutOfDate, (createNewTagData audioFile)
-            else Unchanged, (copyDataFromTagLibrary libraryTags)
-        else NotPresent, (createNewTagData audioFile)
+            then OutOfDate, (createNew audioFile)
+            else Unchanged, (copyFromLibrary libraryTags)
+        else NotPresent, (createNew audioFile)
 
     fileInfos
     |> Seq.map (updateTags tagLibraryMap)
