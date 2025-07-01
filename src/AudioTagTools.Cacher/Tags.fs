@@ -78,7 +78,7 @@ let compareAndUpdateTagData
     : ComparisonResultWithNewTags seq
     =
     let createNewTagData (fileInfo: FileInfo) =
-        let newTags =
+        let blankTags =
             {
                 FileNameOnly = fileInfo.Name
                 DirectoryName = fileInfo.DirectoryName
@@ -90,38 +90,32 @@ let compareAndUpdateTagData
                 Year = 0u
                 Genres = [| String.Empty |]
                 Duration = TimeSpan.Zero
-                LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
+                LastWriteTime = DateTimeOffset fileInfo.LastWriteTime
+            }
+
+        let copyTagsFromFile (fileInfo: FileInfo) (fileTags: TaggedFile) =
+            {
+                FileNameOnly = fileInfo.Name
+                DirectoryName = fileInfo.DirectoryName
+                Artists = fileTags.Tag.Performers |> Array.map _.Normalize()
+                AlbumArtists = fileTags.Tag.AlbumArtists |> Array.map _.Normalize()
+                Album = fileTags.Tag.Album.Normalize()
+                TrackNo = fileTags.Tag.Track
+                Title = fileTags.Tag.Title
+                Year = fileTags.Tag.Year
+                Genres = fileTags.Tag.Genres
+                Duration = fileTags.Properties.Duration
+                LastWriteTime = DateTimeOffset fileInfo.LastWriteTime
             }
 
         let fileTags = readFileTags fileInfo.FullName
 
         match fileTags with
-        | Error _ -> newTags
+        | Error _ -> blankTags
         | Ok fileTags ->
             if fileTags.Tag = null
-            then newTags
-            else
-                // Copy the latest tags from the file itself.
-                {
-                    FileNameOnly = fileInfo.Name
-                    DirectoryName = fileInfo.DirectoryName
-                    Artists = if fileTags.Tag.Performers = null
-                              then [| String.Empty |]
-                              else fileTags.Tag.Performers
-                                   |> Array.map _.Normalize()
-                    AlbumArtists = if fileTags.Tag.AlbumArtists = null
-                                   then [| String.Empty |]
-                                   else fileTags.Tag.AlbumArtists |> Array.map _.Normalize()
-                    Album = if fileTags.Tag.Album = null
-                            then String.Empty
-                            else fileTags.Tag.Album.Normalize()
-                    TrackNo = fileTags.Tag.Track
-                    Title = fileTags.Tag.Title
-                    Year = fileTags.Tag.Year
-                    Genres = fileTags.Tag.Genres
-                    Duration = fileTags.Properties.Duration
-                    LastWriteTime = fileInfo.LastWriteTime |> DateTimeOffset
-                }
+            then blankTags
+            else copyTagsFromFile fileInfo fileTags
 
     let copyDataFromTagLibrary (libraryTags: TagLibraryProvider.Root) =
         {
