@@ -49,7 +49,9 @@ let private tagSample = """
 type TagLibraryProvider = JsonProvider<tagSample>
 type Tags = TagLibraryProvider.Root
 type TagMap = Map<string, Tags>
-type CategorizedTagsToWrite = ComparisonResult * TagsToWrite
+type CategorizedTagsToWrite =
+    { Category: ComparisonResult
+      Tags: TagsToWrite }
 
 let createTagLibraryMap (tagLibraryFile: FileInfo) : Result<TagMap, Error> =
     let parseTagLibrary json : Result<Tags array, Error> =
@@ -136,9 +138,9 @@ let private prepareTagsToWrite (tagLibraryMap: TagMap) (fileInfos: FileInfo seq)
         then
             let libraryTags = Map.find audioFile.FullName tagLibraryMap
             if libraryTags.LastWriteTime.DateTime < audioFile.LastWriteTime
-            then OutOfDate, (generateTags audioFile)
-            else Unchanged, (copyCachedTags libraryTags)
-        else NotPresent, (generateTags audioFile)
+            then { Category = OutOfDate; Tags = (generateTags audioFile) }
+            else { Category = Unchanged; Tags = (copyCachedTags libraryTags) }
+        else { Category = NotPresent; Tags = (generateTags audioFile) }
 
     fileInfos
     |> Seq.map (prepareTags tagLibraryMap)
@@ -147,7 +149,7 @@ let private reportResults (results: CategorizedTagsToWrite seq) : CategorizedTag
     let initialCounts = {| NotPresent = 0; OutOfDate = 0; Unchanged = 0 |}
 
     let totals =
-        (initialCounts, results |> Seq.map fst)
+        (initialCounts, Seq.map _.Category results)
         ||> Seq.fold (fun acc result ->
             match result with
             | NotPresent -> {| acc with NotPresent = acc.NotPresent + 1 |}
@@ -170,6 +172,6 @@ let generateNewJson
     fileInfos
     |> prepareTagsToWrite tagLibraryMap
     |> reportResults
-    |> Seq.map snd
+    |> Seq.map _.Tags
     |> serializeToJson
     |> Result.mapError JsonSerializationError
