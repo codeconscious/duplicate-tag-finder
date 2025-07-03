@@ -24,9 +24,9 @@ type TagsToWrite =
     }
 
 type ComparisonResult =
-    | Unchanged
-    | OutOfDate // The file tags are newer than the library's.
-    | NotPresent // Tags for the specified file don't exist in the tag library.
+    | Unchanged // File tags match the library tags.
+    | OutOfDate // File tags are newer than library tags.
+    | NotPresent // File tags do not exist in tag library.
 
 [<Literal>]
 let private tagSample = """
