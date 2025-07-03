@@ -8,7 +8,7 @@ open Operators
 open Utilities
 open FsToolkit.ErrorHandling
 
-type FileTagsToWrite =
+type TagsToWrite =
     {
         FileNameOnly: string
         DirectoryName: string
@@ -47,21 +47,22 @@ let private tagSample = """
 ]"""
 
 type TagLibraryProvider = JsonProvider<tagSample>
-type TagLibraryMap = Map<string, TagLibraryProvider.Root>
-type ComparisonResultWithNewTags = ComparisonResult * FileTagsToWrite
+type Tags = TagLibraryProvider.Root
+type TagMap = Map<string, Tags>
+type CategorizedTagsToWrite = ComparisonResult * TagsToWrite
 
-let parseTagLibrary json : Result<TagLibraryProvider.Root array, Error> =
-    try
-        json
-        |> TagLibraryProvider.Parse
-        |> Ok
-    with
-    | e -> Error (ParseError e.Message)
+let createTagLibraryMap (tagLibraryFile: FileInfo) : Result<TagMap, Error> =
+    let parseTagLibrary json : Result<Tags array, Error> =
+        try
+            json
+            |> TagLibraryProvider.Parse
+            |> Ok
+        with
+        | e -> Error (ParseError e.Message)
 
-let audioFilePath (fileTags: TagLibraryProvider.Root) : string =
-    Path.Combine [| fileTags.DirectoryName; fileTags.FileNameOnly |]
+    let audioFilePath (fileTags: Tags) : string =
+        Path.Combine [| fileTags.DirectoryName; fileTags.FileNameOnly |]
 
-let createTagLibraryMap (tagLibraryFile: FileInfo) : Result<TagLibraryMap, Error> =
     if tagLibraryFile.Exists
     then
         tagLibraryFile.FullName
@@ -72,10 +73,10 @@ let createTagLibraryMap (tagLibraryFile: FileInfo) : Result<TagLibraryMap, Error
     else
         Ok Map.empty
 
-let compareAndUpdateTagData (tagLibraryMap: TagLibraryMap) (fileInfos: FileInfo seq)
-    : ComparisonResultWithNewTags seq
+let private prepareTagsToWrite (tagLibraryMap: TagMap) (fileInfos: FileInfo seq)
+    : CategorizedTagsToWrite seq
     =
-    let copyCachedTags (libraryTags: TagLibraryProvider.Root) =
+    let copyCachedTags (libraryTags: Tags) =
         {
             FileNameOnly = libraryTags.FileNameOnly
             DirectoryName = libraryTags.DirectoryName
@@ -90,7 +91,7 @@ let compareAndUpdateTagData (tagLibraryMap: TagLibraryMap) (fileInfos: FileInfo 
             LastWriteTime = DateTimeOffset libraryTags.LastWriteTime.DateTime
         }
 
-    let generateNewTags (fileInfo: FileInfo) : FileTagsToWrite =
+    let generateTags (fileInfo: FileInfo) : TagsToWrite =
         let blankTags =
             {
                 FileNameOnly = fileInfo.Name
@@ -130,19 +131,19 @@ let compareAndUpdateTagData (tagLibraryMap: TagLibraryMap) (fileInfos: FileInfo 
             then blankTags
             else tagsFromFile fileInfo fileTags
 
-    let makeUpdates (tagLibraryMap: TagLibraryMap) (audioFile: FileInfo) : ComparisonResultWithNewTags =
+    let prepareTags (tagLibraryMap: TagMap) (audioFile: FileInfo) : CategorizedTagsToWrite =
         if Map.containsKey audioFile.FullName tagLibraryMap
         then
             let libraryTags = Map.find audioFile.FullName tagLibraryMap
             if libraryTags.LastWriteTime.DateTime < audioFile.LastWriteTime
-            then OutOfDate, (generateNewTags audioFile)
+            then OutOfDate, (generateTags audioFile)
             else Unchanged, (copyCachedTags libraryTags)
-        else NotPresent, (generateNewTags audioFile)
+        else NotPresent, (generateTags audioFile)
 
     fileInfos
-    |> Seq.map (makeUpdates tagLibraryMap)
+    |> Seq.map (prepareTags tagLibraryMap)
 
-let reportResults (results: ComparisonResultWithNewTags seq) : ComparisonResultWithNewTags seq =
+let private reportResults (results: CategorizedTagsToWrite seq) : CategorizedTagsToWrite seq =
     let initialCounts = {| NotPresent = 0; OutOfDate = 0; Unchanged = 0 |}
 
     let totals =
@@ -162,12 +163,12 @@ let reportResults (results: ComparisonResultWithNewTags seq) : ComparisonResultW
     results
 
 let generateNewJson
-    (tagLibraryMap: TagLibraryMap)
+    (tagLibraryMap: TagMap)
     (fileInfos: FileInfo seq)
     : Result<string, Error>
     =
     fileInfos
-    |> compareAndUpdateTagData tagLibraryMap
+    |> prepareTagsToWrite tagLibraryMap
     |> reportResults
     |> Seq.map snd
     |> serializeToJson
