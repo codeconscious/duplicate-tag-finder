@@ -49,7 +49,7 @@ let private tagSample = """
 type TagLibraryProvider = JsonProvider<tagSample>
 type Tags = TagLibraryProvider.Root
 type TagMap = Map<string, Tags>
-type CategorizedTagsToWrite =
+type CategorizedTagsToSave =
     { Category: ComparisonResult
       Tags: TagsToWrite }
 
@@ -76,7 +76,7 @@ let createTagLibraryMap (tagLibraryFile: FileInfo) : Result<TagMap, Error> =
         Ok Map.empty
 
 let private prepareTagsToWrite (tagLibraryMap: TagMap) (fileInfos: FileInfo seq)
-    : CategorizedTagsToWrite seq
+    : CategorizedTagsToSave seq
     =
     let copyCachedTags (libraryTags: Tags) =
         {
@@ -133,7 +133,7 @@ let private prepareTagsToWrite (tagLibraryMap: TagMap) (fileInfos: FileInfo seq)
             then blankTags
             else tagsFromFile fileInfo fileTags
 
-    let prepareTags (tagLibraryMap: TagMap) (audioFile: FileInfo) : CategorizedTagsToWrite =
+    let prepareTags (tagLibraryMap: TagMap) (audioFile: FileInfo) : CategorizedTagsToSave =
         if Map.containsKey audioFile.FullName tagLibraryMap
         then
             let libraryTags = Map.find audioFile.FullName tagLibraryMap
@@ -145,7 +145,7 @@ let private prepareTagsToWrite (tagLibraryMap: TagMap) (fileInfos: FileInfo seq)
     fileInfos
     |> Seq.map (prepareTags tagLibraryMap)
 
-let private reportResults (results: CategorizedTagsToWrite seq) : CategorizedTagsToWrite seq =
+let private reportResults (results: CategorizedTagsToSave seq) : CategorizedTagsToSave seq =
     let initialCounts = {| NotPresent = 0; OutOfDate = 0; Unchanged = 0 |}
 
     let totals =
