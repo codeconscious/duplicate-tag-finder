@@ -75,7 +75,7 @@ let createTagLibraryMap (tagLibraryFile: FileInfo) : Result<TagLibraryMap, Error
 let compareAndUpdateTagData (tagLibraryMap: TagLibraryMap) (fileInfos: FileInfo seq)
     : ComparisonResultWithNewTags seq
     =
-    let copyFromLibrary (libraryTags: TagLibraryProvider.Root) =
+    let copyCachedTags (libraryTags: TagLibraryProvider.Root) =
         {
             FileNameOnly = libraryTags.FileNameOnly
             DirectoryName = libraryTags.DirectoryName
@@ -90,7 +90,7 @@ let compareAndUpdateTagData (tagLibraryMap: TagLibraryMap) (fileInfos: FileInfo 
             LastWriteTime = DateTimeOffset libraryTags.LastWriteTime.DateTime
         }
 
-    let createNew (fileInfo: FileInfo) : FileTagsToWrite =
+    let generateNewTags (fileInfo: FileInfo) : FileTagsToWrite =
         let blankTags =
             {
                 FileNameOnly = fileInfo.Name
@@ -106,7 +106,7 @@ let compareAndUpdateTagData (tagLibraryMap: TagLibraryMap) (fileInfos: FileInfo 
                 LastWriteTime = DateTimeOffset fileInfo.LastWriteTime
             }
 
-        let readFromFile (fileInfo: FileInfo) (fileTags: TaggedFile) =
+        let tagsFromFile (fileInfo: FileInfo) (fileTags: TaggedFile) =
             {
                 FileNameOnly = fileInfo.Name
                 DirectoryName = fileInfo.DirectoryName
@@ -128,19 +128,19 @@ let compareAndUpdateTagData (tagLibraryMap: TagLibraryMap) (fileInfos: FileInfo 
         | Ok fileTags ->
             if fileTags.Tag = null
             then blankTags
-            else readFromFile fileInfo fileTags
+            else tagsFromFile fileInfo fileTags
 
-    let updateTags (tagLibraryMap: TagLibraryMap) (audioFile: FileInfo) : ComparisonResultWithNewTags =
+    let makeUpdates (tagLibraryMap: TagLibraryMap) (audioFile: FileInfo) : ComparisonResultWithNewTags =
         if Map.containsKey audioFile.FullName tagLibraryMap
         then
             let libraryTags = Map.find audioFile.FullName tagLibraryMap
             if libraryTags.LastWriteTime.DateTime < audioFile.LastWriteTime
-            then OutOfDate, (createNew audioFile)
-            else Unchanged, (copyFromLibrary libraryTags)
-        else NotPresent, (createNew audioFile)
+            then OutOfDate, (generateNewTags audioFile)
+            else Unchanged, (copyCachedTags libraryTags)
+        else NotPresent, (generateNewTags audioFile)
 
     fileInfos
-    |> Seq.map (updateTags tagLibraryMap)
+    |> Seq.map (makeUpdates tagLibraryMap)
 
 let reportResults (results: ComparisonResultWithNewTags seq) : ComparisonResultWithNewTags seq =
     let initialCounts = {| NotPresent = 0; OutOfDate = 0; Unchanged = 0 |}
