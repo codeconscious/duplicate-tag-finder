@@ -23,7 +23,7 @@ let getFileInfos (dirPath: DirectoryInfo) : Result<FileInfo seq, Error> =
     with
     | e -> Error (GeneralIoError e.Message)
 
-let readFileTags (filePath: string) : Result<TaggedFile, Error> =
+let parseFileTags (filePath: string) : Result<TaggedFile, Error> =
     try Ok (TaggedFile.Create filePath)
     with e -> Error (ParseError e.Message)
 

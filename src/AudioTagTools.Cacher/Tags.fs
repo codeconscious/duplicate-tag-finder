@@ -121,7 +121,7 @@ let compareAndUpdateTagData (tagLibraryMap: TagLibraryMap) (fileInfos: FileInfo 
                 LastWriteTime = DateTimeOffset fileInfo.LastWriteTime
             }
 
-        let fileTags = readFileTags fileInfo.FullName
+        let fileTags = parseFileTags fileInfo.FullName
 
         match fileTags with
         | Error _ -> blankTags
