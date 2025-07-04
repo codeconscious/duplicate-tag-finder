@@ -8,7 +8,7 @@ open Operators
 open Utilities
 open FsToolkit.ErrorHandling
 
-type TagsToWrite =
+type TagsToCache =
     {
         FileNameOnly: string
         DirectoryName: string
@@ -23,13 +23,8 @@ type TagsToWrite =
         LastWriteTime: DateTimeOffset
     }
 
-type ComparisonResult =
-    | Unchanged // File tags match the library tags.
-    | OutOfDate // File tags are newer than library tags.
-    | NotPresent // File tags do not exist in tag library.
-
 [<Literal>]
-let private tagSample = """
+let private tagLibrarySampleJson = """
 [
   {
     "FileNameOnly": "name",
@@ -46,23 +41,27 @@ let private tagSample = """
   }
 ]"""
 
-type TagLibraryProvider = JsonProvider<tagSample>
-type Tags = TagLibraryProvider.Root
-type TagMap = Map<string, Tags>
-type CategorizedTagsToSave =
-    { Category: ComparisonResult
-      Tags: TagsToWrite }
+type TagLibraryProvider = JsonProvider<tagLibrarySampleJson>
+
+type LibraryTags = TagLibraryProvider.Root
+
+type TagMap = Map<string, LibraryTags>
+
+type LibraryComparisonResult =
+    | Unchanged // Library tags match file tags.
+    | OutOfDate // Library tags are older than file tags.
+    | NotPresent // No tags exist in library for file.
+
+type CategorizedTagsToCache =
+    { Type: LibraryComparisonResult
+      Tags: TagsToCache }
 
 let createTagLibraryMap (tagLibraryFile: FileInfo) : Result<TagMap, Error> =
-    let parseTagLibrary json : Result<Tags array, Error> =
-        try
-            json
-            |> TagLibraryProvider.Parse
-            |> Ok
-        with
-        | e -> Error (ParseError e.Message)
+    let parseTagLibrary json : Result<LibraryTags array, Error> =
+        try Ok (TagLibraryProvider.Parse json)
+        with e -> Error (ParseError e.Message)
 
-    let audioFilePath (fileTags: Tags) : string =
+    let audioFilePath (fileTags: LibraryTags) : string =
         Path.Combine [| fileTags.DirectoryName; fileTags.FileNameOnly |]
 
     if tagLibraryFile.Exists
@@ -76,9 +75,9 @@ let createTagLibraryMap (tagLibraryFile: FileInfo) : Result<TagMap, Error> =
         Ok Map.empty
 
 let private prepareTagsToWrite (tagLibraryMap: TagMap) (fileInfos: FileInfo seq)
-    : CategorizedTagsToSave seq
+    : CategorizedTagsToCache seq
     =
-    let copyCachedTags (libraryTags: Tags) =
+    let copyCachedTags (libraryTags: LibraryTags) =
         {
             FileNameOnly = libraryTags.FileNameOnly
             DirectoryName = libraryTags.DirectoryName
@@ -93,7 +92,7 @@ let private prepareTagsToWrite (tagLibraryMap: TagMap) (fileInfos: FileInfo seq)
             LastWriteTime = DateTimeOffset libraryTags.LastWriteTime.DateTime
         }
 
-    let generateTags (fileInfo: FileInfo) : TagsToWrite =
+    let generateTags (fileInfo: FileInfo) : TagsToCache =
         let blankTags =
             {
                 FileNameOnly = fileInfo.Name
@@ -133,23 +132,23 @@ let private prepareTagsToWrite (tagLibraryMap: TagMap) (fileInfos: FileInfo seq)
             then blankTags
             else tagsFromFile fileInfo fileTags
 
-    let prepareTags (tagLibraryMap: TagMap) (audioFile: FileInfo) : CategorizedTagsToSave =
+    let prepareTagsToCache (tagLibraryMap: TagMap) (audioFile: FileInfo) : CategorizedTagsToCache =
         if Map.containsKey audioFile.FullName tagLibraryMap
         then
             let libraryTags = Map.find audioFile.FullName tagLibraryMap
             if libraryTags.LastWriteTime.DateTime < audioFile.LastWriteTime
-            then { Category = OutOfDate; Tags = (generateTags audioFile) }
-            else { Category = Unchanged; Tags = (copyCachedTags libraryTags) }
-        else { Category = NotPresent; Tags = (generateTags audioFile) }
+            then { Type = OutOfDate; Tags = (generateTags audioFile) }
+            else { Type = Unchanged; Tags = (copyCachedTags libraryTags) }
+        else { Type = NotPresent; Tags = (generateTags audioFile) }
 
     fileInfos
-    |> Seq.map (prepareTags tagLibraryMap)
+    |> Seq.map (prepareTagsToCache tagLibraryMap)
 
-let private reportResults (results: CategorizedTagsToSave seq) : CategorizedTagsToSave seq =
+let private reportResults (results: CategorizedTagsToCache seq) : CategorizedTagsToCache seq =
     let initialCounts = {| NotPresent = 0; OutOfDate = 0; Unchanged = 0 |}
 
     let totals =
-        (initialCounts, Seq.map _.Category results)
+        (initialCounts, Seq.map _.Type results)
         ||> Seq.fold (fun acc result ->
             match result with
             | NotPresent -> {| acc with NotPresent = acc.NotPresent + 1 |}
