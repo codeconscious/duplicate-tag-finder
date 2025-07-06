@@ -1,14 +1,14 @@
 module Tags
 
 open System
+open System.Text.Json
 open IO
-open FSharp.Data
 open Errors
 open Operators
 open Utilities
 open FsToolkit.ErrorHandling
 
-type TagsToCache =
+type LibraryTags =
     {
         FileNameOnly: string
         DirectoryName: string
@@ -23,28 +23,6 @@ type TagsToCache =
         LastWriteTime: DateTimeOffset
     }
 
-[<Literal>]
-let private tagLibrarySampleJson = """
-[
-  {
-    "FileNameOnly": "name",
-    "DirectoryName": "name",
-    "Artists": ["name"],
-    "AlbumArtists": ["name"],
-    "Album": "name",
-    "TrackNo": 0,
-    "Title": "name",
-    "Year": 0,
-    "Genres": ["name"],
-    "Duration": "00:00:00",
-    "LastWriteTime": "2023-09-13T13:49:44+09:00"
-  }
-]"""
-
-type TagLibraryProvider = JsonProvider<tagLibrarySampleJson>
-
-type LibraryTags = TagLibraryProvider.Root
-
 type TagMap = Map<string, LibraryTags>
 
 type LibraryComparisonResult =
@@ -54,19 +32,19 @@ type LibraryComparisonResult =
 
 type CategorizedTagsToCache =
     { Type: LibraryComparisonResult
-      Tags: TagsToCache }
+      Tags: LibraryTags }
 
-let createTagLibraryMap (tagLibraryFile: FileInfo) : Result<TagMap, Error> =
-    let parseTagLibrary json : Result<LibraryTags array, Error> =
-        try Ok (TagLibraryProvider.Parse json)
+let createTagLibraryMap (libraryFile: FileInfo) : Result<TagMap, Error> =
+    let parseTagLibrary (json: string) : Result<LibraryTags array, Error> =
+        try Ok (JsonSerializer.Deserialize<LibraryTags array>(json))
         with e -> Error (ParseError e.Message)
 
     let audioFilePath (fileTags: LibraryTags) : string =
         Path.Combine [| fileTags.DirectoryName; fileTags.FileNameOnly |]
 
-    if tagLibraryFile.Exists
+    if libraryFile.Exists
     then
-        tagLibraryFile.FullName
+        libraryFile.FullName
         |> readfile
         >>= parseTagLibrary
         <!> Array.map (fun tags -> audioFilePath tags, tags)
@@ -92,7 +70,7 @@ let private prepareTagsToWrite (tagLibraryMap: TagMap) (fileInfos: FileInfo seq)
             LastWriteTime = DateTimeOffset libraryTags.LastWriteTime.DateTime
         }
 
-    let generateTags (fileInfo: FileInfo) : TagsToCache =
+    let generateTags (fileInfo: FileInfo) : LibraryTags =
         let blankTags =
             {
                 FileNameOnly = fileInfo.Name
@@ -112,9 +90,16 @@ let private prepareTagsToWrite (tagLibraryMap: TagMap) (fileInfos: FileInfo seq)
             {
                 FileNameOnly = fileInfo.Name
                 DirectoryName = fileInfo.DirectoryName
-                Artists = fileTags.Tag.Performers |> Array.map _.Normalize()
-                AlbumArtists = fileTags.Tag.AlbumArtists |> Array.map _.Normalize()
-                Album = fileTags.Tag.Album.Normalize()
+                Artists = if fileTags.Tag.Performers = null
+                          then [| String.Empty |]
+                          else fileTags.Tag.Performers
+                               |> Array.map (fun p -> p.Normalize())
+                AlbumArtists = if fileTags.Tag.AlbumArtists = null
+                               then [| String.Empty |]
+                               else fileTags.Tag.AlbumArtists |> Array.map _.Normalize()
+                Album = if fileTags.Tag.Album = null
+                        then String.Empty
+                        else fileTags.Tag.Album.Normalize()
                 TrackNo = fileTags.Tag.Track
                 Title = fileTags.Tag.Title
                 Year = fileTags.Tag.Year
