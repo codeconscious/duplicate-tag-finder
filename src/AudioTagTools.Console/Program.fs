@@ -26,6 +26,8 @@ let main args : int =
         let command = args[0]
         let flags = args[1..]
 
+        printfn "Starting..."
+
         match Map.tryFind command commandMap with
         | Some requestedOperation ->
             match requestedOperation flags with

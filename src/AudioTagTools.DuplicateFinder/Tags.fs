@@ -43,8 +43,9 @@ let private hasArtistOrTitle track =
 let private mainArtists (separator: string) (track: FileTags) =
     match track with
     | t when t.AlbumArtists.Length > 0
+             && t.AlbumArtists[0] <> "Various"
              && t.AlbumArtists[0] <> "Various Artists"
-             && t.AlbumArtists[0] <> "Various" ->
+             && t.AlbumArtists[0] <> "Multiple Artists" ->
         t.AlbumArtists
     | t ->
         t.Artists
